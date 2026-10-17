@@ -23,7 +23,7 @@ export default ts.config(
     languageOptions: { globals: { ...globals.browser, ...globals.serviceworker } },
   },
   {
-    files: ['server/**/*.ts', 'api/**/*.ts', 'tests/**/*.ts', 'shared/**/*.ts', '*.config.{js,ts}'],
+    files: ['server/**/*.ts', 'scripts/**/*.ts', 'api/**/*.ts', 'tests/**/*.ts', 'shared/**/*.ts', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
 );

@@ -5,6 +5,7 @@ import { createDb } from '../db.js';
 import { migrate } from '../migrate.js';
 import { resetForLaunch, seedWelcome } from './launch.js';
 import { runAdminCommand } from './admin.js';
+import { importFromFiles } from './import-history.js';
 
 async function main() {
   const target = process.env.VERCEL_ENV;
@@ -38,6 +39,13 @@ async function main() {
     if (process.env.VW_LAUNCH_SEED === '1') {
       const { created } = await seedWelcome(db);
       console.log(created ? `Launch seed: added ${created} welcome topics.` : 'Launch seed: welcome topics already present.');
+    }
+    // WhatsApp history import, listings only. Paths are relative to the build root. Safe to run twice:
+    // a listing whose source_key or name already exists is skipped. Remove the variables after the deploy.
+    const importFile = process.env.VW_IMPORT_FILE?.trim();
+    if (importFile) {
+      const r = await importFromFiles(db, process.cwd(), importFile, process.env.VW_IMPORT_EXCLUDE_FILE?.trim() || undefined);
+      console.log(`History import: ${r.inserted} added, ${r.skippedSourceKey + r.skippedName} already present, ${r.excluded} excluded.`);
     }
   } finally {
     await db.close();

@@ -10,5 +10,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["server", "api", "shared", "tests/api", "tests/build", "tests/helpers.ts"]
+  "include": ["server", "api", "shared", "scripts", "tests/api", "tests/build", "tests/helpers.ts"]
 }
