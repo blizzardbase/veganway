@@ -61,7 +61,7 @@ function EditForm({ service, onDone }: { service: ServiceProfile; onDone: () => 
           errors={{ whatsapp: errors['contact.whatsapp'], instagram: errors['contact.instagram'], website: errors['contact.website'] }}
         />
       )}
-      <Link to={`/add/offer?listing=${service.id}`} className="flex h-11 items-center gap-2 text-sm font-bold text-brand">
+      <Link to={`/add/offer?listing=${encodeURIComponent(service.slug)}`} className="flex h-11 items-center gap-2 text-sm font-bold text-brand">
         <TagIcon size={18} aria-hidden="true" /> Post an offer
       </Link>
       {formError && <p role="alert" className="text-sm font-semibold text-danger">{formError}</p>}

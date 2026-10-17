@@ -216,9 +216,18 @@ export function useCreateListing() {
 /** Reports belong to the services, me and admin slice (POST /api/reports). */
 export type ReportReason = 'spam' | 'wrong_info' | 'offensive' | 'personal_info' | 'other';
 
+export type ReportDestination =
+  | { target_type: 'listing' | 'recommendation' | 'photo'; target_id: string }
+  | { target_type: 'photo'; photo_url: string };
+
 export function useReport() {
   return useMutation({
-    mutationFn: (body: { target_type: 'listing' | 'recommendation'; target_id: string; reason: ReportReason }) =>
-      api.post<unknown>('/api/reports', body),
+    mutationFn: async (body: ReportDestination & { reason: ReportReason }) => {
+      if ('photo_url' in body) {
+        const photo = await api.get<{ id: string }>(`/api/reports/photo-target?url=${encodeURIComponent(body.photo_url)}`);
+        return api.post<unknown>('/api/reports', { target_type: 'photo', target_id: photo.id, reason: body.reason });
+      }
+      return api.post<unknown>('/api/reports', body);
+    },
   });
 }

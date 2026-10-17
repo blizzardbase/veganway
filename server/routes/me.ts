@@ -69,7 +69,7 @@ export function router(deps: Deps): Router {
 
   const readProfile = (id: string) => db.one<ProfileRow>(
     `SELECT u.pseudonym, u.display_name, u.bio, u.avatar_photo_id, p.blob_path, u.theme, u.has_service, u.role
-     FROM users u LEFT JOIN photos p ON p.id = u.avatar_photo_id AND p.deleted_at IS NULL WHERE u.id = $1`,
+     FROM users u LEFT JOIN photos p ON p.id = u.avatar_photo_id AND p.deleted_at IS NULL AND NOT p.hidden WHERE u.id = $1`,
     [id],
   );
 
@@ -90,7 +90,7 @@ export function router(deps: Deps): Router {
     }
     if (about) rejectContact(about);
     if (body.avatarPhotoId) {
-      const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL', [body.avatarPhotoId, me.id]);
+      const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND NOT hidden', [body.avatarPhotoId, me.id]);
       if (!ok) fail(400, 'That photo was not found. Please add it again.', 'invalid_input', 'avatarPhotoId');
     }
     const sets: string[] = [];
@@ -187,9 +187,15 @@ export function router(deps: Deps): Router {
     const me = currentUser(res);
     const body = parse(deleteBody, req.body);
     await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<{ pw_hash: string }>('SELECT pw_hash FROM users WHERE id = $1', [me.id]);
+    const row = await db.one<{ pw_hash: string; recovery_hash: string }>('SELECT pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
     if (!(await passwords.verify(body.password, row.pw_hash))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
     const blobPaths = await db.tx(async (q) => {
+      const current = await q.maybeOne(
+        `SELECT id FROM users WHERE id = $1 AND pw_hash = $2 AND recovery_hash = $3
+         AND banned_at IS NULL AND deleted_at IS NULL AND NOT is_system FOR UPDATE`,
+        [me.id, row.pw_hash, row.recovery_hash],
+      );
+      if (!current) fail(401, 'Your credentials changed. Please sign in again.', 'bad_credentials');
       await q.query('DELETE FROM sessions WHERE user_id = $1', [me.id]);
       // The avatar goes, and so does every photo they uploaded that no visible listing or
       // recommendation still shows. Photos on posts that stay keep showing under "Former member".
@@ -218,7 +224,7 @@ export function router(deps: Deps): Router {
       await audit(q, { actorId: me.id, action: 'account.delete', targetType: 'user', targetId: me.id, detail: { photosDeleted: photos.length } });
       return photos.map((p) => p.blob_path);
     });
-    await deleteMedia(deps.media, blobPaths);
+    await deleteMedia(deps.media, blobPaths, db);
     clearSessionCookie(deps, res);
     res.json({ ok: true, user: null, csrf: null });
   });

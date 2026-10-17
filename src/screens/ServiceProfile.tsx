@@ -19,6 +19,9 @@ import { OwnerBadge, VeganStatusTag } from '../features/listings/bits';
 import { useListing, useSetSaved } from '../features/listings/api';
 import { ReportSheet } from '../features/admin/ReportSheet';
 
+import { ReportButton } from '../features/listings/ReportSheet';
+import { areaLabel } from '../../shared/types/listings';
+
 const LINK_REL = 'noopener noreferrer nofollow ugc';
 const ICONS = { whatsapp: MessageCircle, instagram: AtSign, website: Globe };
 
@@ -103,7 +106,10 @@ export function ServiceProfile() {
 
       <article className="flex flex-col gap-6 pb-6">
         <header className="flex flex-col gap-4">
-          <HeroMedia name={s.name} category={s.category} kind="service" photoUrl={s.photoUrl} className="-mt-2" />
+          <div data-testid="listing-photo">
+            <HeroMedia name={s.name} category={s.category} kind="service" photoUrl={s.photoUrl} className="-mt-2" />
+            {s.photoUrl && s.photoId && <div className="flex justify-end"><ReportButton targetType="photo" targetId={s.photoId} variant="text" /></div>}
+          </div>
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-extrabold break-words">{s.name}</h1>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -114,7 +120,7 @@ export function ServiceProfile() {
             {s.area && (
               <p className="flex items-center gap-1.5 text-base text-muted">
                 <MapPin size={18} aria-hidden="true" />
-                {s.area}
+                {areaLabel(s.area)}
               </p>
             )}
             <OpinionSummary count={listing?.recommendCount ?? s.counts.recommend} />

@@ -159,8 +159,8 @@ async function loadListings(db: Queryable, ids: string[]): Promise<Map<string, L
             ${AUTHOR_COLS}
      FROM listings l
      JOIN users u ON u.id = l.created_by
-     LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL
-     LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL
+     LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden
+     LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL AND NOT p.hidden
      WHERE l.id = ANY($1::uuid[])`,
     [ids],
   );
@@ -205,8 +205,8 @@ async function loadRecs(db: Queryable, ids: string[], viewerId: string | null): 
             ${AUTHOR_COLS}
      FROM recommendations r
      JOIN users u ON u.id = r.user_id
-     LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL
-     LEFT JOIN photos p ON p.id = r.photo_id AND p.deleted_at IS NULL
+     LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden
+     LEFT JOIN photos p ON p.id = r.photo_id AND p.deleted_at IS NULL AND NOT p.hidden
      WHERE r.id = ANY($1::uuid[])`,
     [ids, viewerId],
   );

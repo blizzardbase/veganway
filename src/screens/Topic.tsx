@@ -129,10 +129,10 @@ export function Topic() {
             <h2 className="text-sm font-bold text-muted">Linked</h2>
             <ul className="flex flex-wrap gap-2">
               {t.listings.map((l) => (
-                <li key={l.id}>
-                  <Link to={listingHref(l)} className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-surface-2">
-                    {l.name}
-                    <span className="text-xs font-bold text-muted">{l.kind === 'place' ? 'Place' : l.kind === 'product' ? 'Product' : 'Service'}</span>
+                <li key={l.id} className="min-w-0 max-w-full">
+                  <Link to={listingHref(l)} className="inline-flex h-11 max-w-full items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-surface-2">
+                    <span className="min-w-0 truncate" title={l.name}>{l.name}</span>
+                    <span className="shrink-0 text-xs font-bold text-muted">{l.kind === 'place' ? 'Place' : l.kind === 'product' ? 'Product' : 'Service'}</span>
                   </Link>
                 </li>
               ))}

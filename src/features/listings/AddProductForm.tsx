@@ -21,7 +21,7 @@ export default function AddProductForm() {
   const [name, setName] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
   const [category, setCategory] = useState<string[]>([]);
-  const [recommend, setRecommend] = useState(true);
+  const [recommend, setRecommend] = useState(false);
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState<PhotoResponse | null>(null);
   const [uploading, setUploading] = useState(false);

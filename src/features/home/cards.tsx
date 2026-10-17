@@ -8,11 +8,13 @@ import {
 import { Avatar, Monogram, monogramStyle, monoTileClass, Skeleton, Tag } from '../../ui';
 import { cx } from '../../lib/cx';
 import { membersRecommend, replyCount } from '../../lib/counts';
+import { useUser } from '../../api/session';
+import { ReportButton } from '../listings/ReportSheet';
 import { useRequireAccount } from '../auth/Gate';
 import { OfferBadge, OwnerBadge, VeganStatusTag, formatDay } from '../listings/bits';
 import { UpvoteButton } from '../talk/UpvoteButton';
 import { age } from '../talk/format';
-import { listingPath, type ListingKind } from '../../../shared/types/listings';
+import { areaLabel, listingPath, type ListingKind } from '../../../shared/types/listings';
 import type { FeedListing, FeedListingAdded, FeedRecommendation, FeedTopic } from '../../../shared/types/feed';
 import type { TopicSummary } from '../../../shared/types/talk';
 import { useFeedRecUpvote, useFeedTopicUpvote } from './api';
@@ -27,7 +29,7 @@ const KIND: Record<ListingKind, { label: string; icon: LucideIcon }> = {
 const CARD = 'overflow-hidden rounded-card border border-line bg-surface shadow-1';
 
 function whereOf(l: Pick<FeedListing, 'kind' | 'area' | 'stores'>): string {
-  return l.kind === 'product' ? l.stores.join(', ') : l.area ?? '';
+  return l.kind === 'product' ? l.stores.join(', ') : l.area ? areaLabel(l.area) : '';
 }
 
 /** "New place · 3h": what the card is and when it happened. */
@@ -107,6 +109,7 @@ export function ListingAddedCard({ item }: { item: FeedListingAdded }) {
           )}
         </div>
       </Link>
+      {listing.photoUrl && <div className="px-1"><ReportButton targetType="photo" photoUrl={listing.photoUrl} variant="text" /></div>}
     </article>
   );
 }
@@ -133,6 +136,8 @@ export function RecommendationCard({ item }: { item: FeedRecommendation }) {
   const upvote = useFeedRecUpvote(rec.id);
   const requireAccount = useRequireAccount();
   const { who, verb } = whoRecommends(item);
+  const user = useUser();
+  const photoUrl = rec.photoUrl ?? listing.photoUrl;
   return (
     <article data-testid="feed-item" data-type="recommendation" className={cx(CARD, 'relative')}>
       <Link to={listingPath(listing)} className="flex flex-col gap-2 p-3 transition active:scale-[0.99]">
@@ -164,8 +169,13 @@ export function RecommendationCard({ item }: { item: FeedRecommendation }) {
             </span>
           )}
         </div>
+        {rec.photoUrl && <img src={rec.photoUrl} alt="" loading="lazy" decoding="async" className="max-h-60 w-full rounded-input object-cover" />}
         {item.count > 1 && <p className="-mt-1 text-xs text-muted">{item.count} recommendations within an hour</p>}
       </Link>
+      <div className="flex flex-wrap gap-1 px-1">
+        {user?.pseudonym !== rec.author.pseudonym && <ReportButton targetType="recommendation" targetId={rec.id} variant="text" />}
+        {photoUrl && <ReportButton targetType="photo" photoUrl={photoUrl} variant="text" />}
+      </div>
       <div className="absolute top-0.5 right-0.5">
         <UpvoteButton
           label="Upvote recommendation"

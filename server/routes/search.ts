@@ -45,7 +45,6 @@ interface TopicRow {
   reply_snippet: string | null;
   self_match: boolean;
   reply_count: number;
-  total: number;
 }
 
 // $1 = q, $2 = name prefix pattern, $3 = word prefix pattern, $4 = kinds, $5 = per kind limit, $6 = offset
@@ -66,8 +65,8 @@ hits AS (
 matched AS (
   SELECT h.*,
     (SELECT count(*) FROM opinions o WHERE o.listing_id = h.id AND o.value = 'recommend') AS recommend_count,
-    (SELECT p.blob_path FROM photos p WHERE p.id = h.photo_id AND p.deleted_at IS NULL) AS photo_path,
-    row_number() OVER (PARTITION BY h.kind ORDER BY h.self_match DESC, h.rank DESC, h.created_at DESC) AS rn,
+    (SELECT p.blob_path FROM photos p WHERE p.id = h.photo_id AND p.deleted_at IS NULL AND NOT p.hidden) AS photo_path,
+    row_number() OVER (PARTITION BY h.kind ORDER BY h.self_match DESC, h.rank DESC, h.created_at DESC, h.id DESC) AS rn,
     count(*) OVER (PARTITION BY h.kind) AS total
   FROM hits h
   WHERE h.self_match OR h.rec_snippet IS NOT NULL OR h.reply_snippet IS NOT NULL
@@ -86,14 +85,17 @@ hits AS (
     ts_rank(t.search, tsq.q) AS rank
   FROM topics t, tsq
   WHERE NOT t.hidden
+), matched AS (
+  SELECT * FROM hits WHERE self_match OR reply_snippet IS NOT NULL
+), page AS (
+  SELECT h.id, h.kind, h.title, h.body, h.reply_snippet, h.self_match,
+    (SELECT count(*) FROM replies x WHERE x.target_type = 'topic' AND x.target_id = h.id AND NOT x.hidden AND x.deleted_at IS NULL AND ${VISIBLE_PARENT('x')}) AS reply_count
+  FROM matched h
+  ORDER BY h.self_match DESC, h.rank DESC, h.created_at DESC, h.id DESC
+  LIMIT $2 OFFSET $3
 )
-SELECT h.id, h.kind, h.title, h.body, h.reply_snippet, h.self_match,
-  (SELECT count(*) FROM replies x WHERE x.target_type = 'topic' AND x.target_id = h.id AND NOT x.hidden AND x.deleted_at IS NULL AND ${VISIBLE_PARENT('x')}) AS reply_count,
-  count(*) OVER () AS total
-FROM hits h
-WHERE h.self_match OR h.reply_snippet IS NOT NULL
-ORDER BY h.self_match DESC, h.rank DESC, h.created_at DESC
-LIMIT $2 OFFSET $3`;
+SELECT (SELECT count(*)::int FROM matched) AS total,
+  coalesce((SELECT json_agg(page) FROM page), '[]'::json) AS items`;
 
 const clip = (text: string | null, max = 180): string | null => {
   if (!text) return null;
@@ -139,7 +141,8 @@ export function router(deps: Deps): Router {
     const raw = typeof req.query.q === 'string' ? req.query.q : '';
     const q = raw.normalize('NFKC').replace(/\s+/g, ' ').trim().slice(0, SEARCH_MAX);
     const type = SEARCH_TYPES.includes(req.query.type as SearchType) ? (req.query.type as SearchType) : null;
-    const offset = Math.max(0, Math.min(1000, Number.parseInt(String(req.query.offset ?? '0'), 10) || 0));
+    const requestedOffset = Number(req.query.offset ?? 0);
+    const offset = Number.isSafeInteger(requestedOffset) && requestedOffset > 0 ? Math.min(requestedOffset, 1000) : 0;
     const out: SearchResults = { q, places: empty(), products: empty(), services: empty(), discussions: empty() };
     if (!q) {
       res.json(out);
@@ -164,8 +167,8 @@ export function router(deps: Deps): Router {
       }
     }
     if (!type || type === 'discussions') {
-      const rows = await db.query<TopicRow>(TOPICS_SQL, [q, type ? PAGE : TOP, type ? offset : 0]);
-      out.discussions = { total: rows[0]?.total ?? 0, items: rows.map(toTopicHit) };
+      const page = await db.one<{ total: number; items: TopicRow[] }>(TOPICS_SQL, [q, type ? PAGE : TOP, type ? offset : 0]);
+      out.discussions = { total: page.total, items: page.items.map(toTopicHit) };
     }
     res.json(out);
   });

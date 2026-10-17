@@ -3,15 +3,9 @@
 export const SERVICE_CATEGORIES = ['Home baker', 'Caterer', 'Meal prep', 'Cooking class', 'Shop', 'Other'] as const;
 export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];
 
-/** The area value for a service that delivers anywhere in Dubai. */
-export const DELIVERS_ACROSS_DUBAI = 'Delivers across Dubai';
-
-export const SERVICE_AREAS = [
-  DELIVERS_ACROSS_DUBAI,
-  'Downtown', 'Business Bay', 'Dubai Marina', 'JLT', 'JBR', 'Jumeirah', 'Al Barsha', 'Al Quoz', 'Deira',
-  'Bur Dubai', 'Karama', 'Al Wasl', 'Mirdif', 'Dubai Hills', 'Arabian Ranches', 'JVC', 'Motor City',
-  'Silicon Oasis', 'Palm Jumeirah', 'Satwa',
-] as const;
+/** Services use the same stored values as places, imports and Explore. */
+export { DUBAI_AREAS as SERVICE_AREAS } from './listings.js';
+export const DELIVERS_ACROSS_DUBAI = 'Delivery only';
 
 /** What a service says about itself. A product's 'vegan_product' never applies to a service. */
 export const SERVICE_VEGAN_STATUSES = ['fully_vegan', 'vegan_options'] as const;

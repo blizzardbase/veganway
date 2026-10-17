@@ -11,16 +11,22 @@ export function useReport() {
 
 const adminKey = ['admin'] as const;
 
+function useAdminQueue<T extends { next: string | null }>(section: string, url: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: [...adminKey, section, url],
+    queryFn: ({ pageParam }) => api.get<T>(`${url}${pageParam ? `${url.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(pageParam)}` : ''}`),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.next ?? undefined,
+    enabled,
+  });
+}
+
 export function useReportQueue(enabled: boolean) {
-  return useQuery({ queryKey: [...adminKey, 'reports'], queryFn: () => api.get<ReportQueue>('/api/admin/reports'), enabled });
+  return useAdminQueue<ReportQueue>('reports', '/api/admin/reports', enabled);
 }
 
 export function useClaimQueue(enabled: boolean, all: boolean) {
-  return useQuery({
-    queryKey: [...adminKey, 'claims', all],
-    queryFn: () => api.get<ClaimQueue>(`/api/admin/claims${all ? '?status=all' : ''}`),
-    enabled,
-  });
+  return useAdminQueue<ClaimQueue>('claims', `/api/admin/claims${all ? '?status=all' : ''}`, enabled);
 }
 
 export function useAdminListings(enabled: boolean, q: string) {
@@ -31,8 +37,8 @@ export function useAdminListings(enabled: boolean, q: string) {
   });
 }
 
-export function useHiddenList(enabled: boolean) {
-  return useQuery({ queryKey: [...adminKey, 'hidden'], queryFn: () => api.get<HiddenList>('/api/admin/hidden'), enabled });
+export function useHiddenList(enabled: boolean, section: 'items' | 'photos' | 'banned' = 'items') {
+  return useAdminQueue<HiddenList>('hidden', `/api/admin/hidden?section=${section}`, enabled);
 }
 
 export function useAuditLog(enabled: boolean) {

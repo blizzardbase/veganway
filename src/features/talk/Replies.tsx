@@ -8,7 +8,7 @@ import { Flag, MessageCircle, Reply as ReplyIcon, SendHorizontal, Trash2, X } fr
 import { REPLY_MAX, type Reply, type ReplyTargetType } from '../../../shared/types/talk';
 import { api, errorMessage } from '../../api/client';
 import { useUser } from '../../api/session';
-import { Avatar, ButtonLink, IconButton, InlineEmpty, INPUT_FOCUS, Skeleton, Tag, useToast } from '../../ui';
+import { Avatar, Button, ButtonLink, IconButton, InlineEmpty, INPUT_FOCUS, Skeleton, Tag, useToast } from '../../ui';
 import { cx } from '../../lib/cx';
 import { useRequireAccount, joinPath } from '../auth/Gate';
 import { talkKeys, useCreateReply, useReplies, useReplyUpvote } from './api';
@@ -29,7 +29,7 @@ export interface RepliesProps {
 const DELETE_DELAY = 4000;
 
 export function Replies({ targetType, targetId, title = 'Replies', composer = 'sticky' }: RepliesProps) {
-  const { data, isPending, isError, refetch } = useReplies(targetType, targetId);
+  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage, isFetchNextPageError } = useReplies(targetType, targetId);
   const upvote = useReplyUpvote(targetType, targetId);
   const requireAccount = useRequireAccount();
   const qc = useQueryClient();
@@ -86,7 +86,10 @@ export function Replies({ targetType, targetId, title = 'Replies', composer = 's
     });
   };
 
-  const total = data ? data.total - [...pending].length : 0;
+  // Newly posted threads can also arrive on a later fetched page. Prefer that fresh server copy.
+  const threads = new Map(data?.pages.flatMap((page) => page.items).map(thread => [thread.id, thread]));
+  const items = [...threads.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  const total = Math.max(0, (data?.pages[0]?.total ?? 0) - pending.size);
 
   const item = (r: Reply, nested: boolean) => (
     <ReplyItem
@@ -120,17 +123,17 @@ export function Replies({ targetType, targetId, title = 'Replies', composer = 's
           ))}
         </div>
       )}
-      {isError && (
+      {isError && !isFetchNextPageError && (
         <p className="text-sm text-muted">
           Replies did not load. <button type="button" className="h-11 font-bold text-brand underline" onClick={() => void refetch()}>Try again</button>
         </p>
       )}
-      {data && data.items.length === 0 && (
+      {data && items.length === 0 && (
         <InlineEmpty icon={MessageCircle} line="No replies yet. Be the first." />
       )}
-      {data && data.items.length > 0 && (
+      {items.length > 0 && (
         <ul className="flex flex-col gap-4" data-testid="reply-thread">
-          {data.items.map((thread) => (
+          {items.map((thread) => (
             <li key={thread.id} className="flex flex-col gap-3">
               {item(thread, false)}
               {thread.replies.length > 0 && (
@@ -141,6 +144,12 @@ export function Replies({ targetType, targetId, title = 'Replies', composer = 's
             </li>
           ))}
         </ul>
+      )}
+      {isFetchNextPageError && <p role="alert" className="text-sm text-muted">More replies did not load. Try again.</p>}
+      {hasNextPage && (
+        <Button variant="secondary" block busy={isFetchingNextPage} busyLabel="Loading replies" onClick={() => void fetchNextPage()}>
+          {isFetchNextPageError ? 'Try again' : 'Load more replies'}
+        </Button>
       )}
       <Composer
         targetType={targetType}

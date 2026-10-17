@@ -2,11 +2,11 @@ import { Link } from 'react-router';
 import { MapPin, ShoppingBasket, ThumbsUp } from 'lucide-react';
 import { membersRecommend } from '../../lib/counts';
 import { ListingThumb, OfferBadge, OwnerBadge, VeganStatusTag } from './bits';
-import { listingPath, type ListingCard as Card } from '../../../shared/types/listings';
+import { areaLabel, listingPath, type ListingCard as Card } from '../../../shared/types/listings';
 
 /** One listing in Explore, Saved and other lists. The whole card is one link. */
 export function ListingCard({ listing }: { listing: Card }) {
-  const where = listing.kind === 'product' ? listing.stores.join(', ') : listing.area;
+  const where = listing.kind === 'product' ? listing.stores.join(', ') : listing.area ? areaLabel(listing.area) : null;
   return (
     <Link
       to={listingPath(listing)}

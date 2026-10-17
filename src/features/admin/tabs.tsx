@@ -30,6 +30,18 @@ function Loading() {
   );
 }
 
+function RequestError({ query }: { query: { isError: boolean; error: unknown; isFetching: boolean; refetch: () => Promise<unknown> } }) {
+  if (!query.isError) return null;
+  return <div role="alert" className="flex flex-col gap-2 rounded-card border border-danger p-3">
+    <p className="text-sm">Could not load this section. {errorMessage(query.error)}</p>
+    <Button size="md" variant="secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry</Button>
+  </div>;
+}
+
+function More({ query }: { query: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => Promise<unknown> } }) {
+  return query.hasNextPage ? <Button variant="secondary" block busy={query.isFetchingNextPage} busyLabel="Loading" onClick={() => void query.fetchNextPage()}>Load more</Button> : null;
+}
+
 /** Wraps a mutation call with a success toast and an error toast. */
 function useRun() {
   const toast = useToast();
@@ -65,6 +77,7 @@ function ReportCard({ g }: { g: ReportGroup }) {
     run(() => moderate.mutateAsync({ targetType: g.targetType, targetId: g.targetId, action }), done);
   const busy = moderate.isPending || ban.isPending || pin.isPending;
   const authorId = g.preview.authorId;
+  const [confirming, setConfirming] = useState<'photo' | 'ban' | null>(null);
 
   return (
     <Card className="flex flex-col gap-2">
@@ -83,27 +96,45 @@ function ReportCard({ g }: { g: ReportGroup }) {
       {g.notes.map((n, i) => <p key={i} className="rounded-input bg-surface-2 px-3 py-2 text-sm break-words">{n}</p>)}
       <div className="flex flex-wrap gap-2 pt-1">
         {g.preview.hidden
-          ? <Button size="md" variant="secondary" disabled={busy} onClick={() => void act('restore', 'Restored.')}>Restore</Button>
-          : <Button size="md" disabled={busy} onClick={() => void act('hide', 'Hidden.')}>Hide</Button>}
-        <Button size="md" variant="secondary" disabled={busy} onClick={() => void act('dismiss', g.autoHidden && g.targetType !== 'photo' ? 'Reports dismissed. It shows again.' : 'Reports dismissed.')}>Dismiss</Button>
+          ? (g.targetType !== 'photo' || g.autoHidden) && <Button size="md" variant="secondary" disabled={busy} onClick={() => void act('restore', 'Restored.')}>Restore</Button>
+          : <Button size="md" disabled={busy} onClick={() => g.targetType === 'photo' ? setConfirming('photo') : void act('hide', 'Hidden.')}>Hide</Button>}
+        {g.targetType === 'photo' && g.autoHidden && <Button size="md" disabled={busy} onClick={() => setConfirming('photo')}>Hide</Button>}
+        <Button size="md" variant="secondary" disabled={busy} onClick={() => void act('dismiss', g.autoHidden ? 'Reports dismissed. It shows again.' : 'Reports dismissed.')}>Dismiss</Button>
         {g.targetType === 'topic' && (
           <Button size="md" variant="ghost" disabled={busy} onClick={() => void run(() => pin.mutateAsync({ id: g.targetId, pinned: true }), 'Pinned.')}>Pin</Button>
         )}
         {authorId && (
-          <Button size="md" variant="danger" disabled={busy} onClick={() => void run(() => ban.mutateAsync(authorId), 'Member banned. Their posts are hidden.')}>
+          <Button size="md" variant="danger" disabled={busy} onClick={() => setConfirming('ban')}>
             Ban {g.targetType === 'user' ? 'member' : 'author'}
           </Button>
         )}
       </div>
+      {confirming && <div role="group" aria-label="Confirm permanent action" className="flex flex-col gap-2 rounded-input border border-danger p-3">
+        <p className="text-sm font-bold">{confirming === 'photo' ? `Hide ${g.preview.title}?` : `Ban ${g.preview.author ?? g.preview.title}, author of ${g.preview.title}?`}</p>
+        <p className="text-sm">{confirming === 'photo' ? 'This deletes the photo. The photos cannot come back.' : 'This hides their posts and deletes all their photos. The photos cannot come back after unbanning.'}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="md" variant="danger" disabled={busy} onClick={() => {
+            if (confirming === 'photo') void act('hide', 'Hidden.');
+            else if (authorId) void run(() => ban.mutateAsync(authorId), 'Member banned. Their posts are hidden.');
+            setConfirming(null);
+          }}>{confirming === 'photo' ? 'Yes, hide photo' : 'Yes, ban author'}</Button>
+          <Button size="md" variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>Cancel</Button>
+        </div>
+      </div>}
     </Card>
   );
 }
 
 export function ReportsTab() {
-  const { data, isPending } = useReportQueue(true);
-  if (isPending) return <Loading />;
-  if (!data?.groups.length) return <EmptyState icon={Flag} line="No open reports. All clear." />;
-  return <div className="flex flex-col gap-3">{data.groups.map((g) => <ReportCard key={`${g.targetType}:${g.targetId}`} g={g} />)}</div>;
+  const query = useReportQueue(true);
+  if (query.isPending) return <Loading />;
+  const groups = query.data?.pages.flatMap(p => p.groups) ?? [];
+  return <div className="flex flex-col gap-3">
+    <RequestError query={query} />
+    {!groups.length && !query.isError && <EmptyState icon={Flag} line="No open reports. All clear." />}
+    {groups.map(g => <ReportCard key={`${g.targetType}:${g.targetId}`} g={g} />)}
+    <More query={query} />
+  </div>;
 }
 
 // ---------- Hidden ----------
@@ -132,55 +163,55 @@ function HiddenCard({ item }: { item: HiddenItem }) {
           </Button>
         </div>
       ) : (
-        <p className="text-sm text-muted">The photo file was deleted when it was hidden, so it cannot come back.</p>
+        <div className="text-sm text-muted">
+          <p>This photo cannot come back.</p>
+          <p>{item.deletion?.pending ? `Byte deletion pending. ${item.deletion.attempts} attempts. ${item.deletion.error ? 'Storage could not confirm deletion.' : ''}` : 'Photo bytes deleted.'}</p>
+        </div>
       )}
     </Card>
   );
 }
 
-/** Below the reports queue: everything hidden now, with Restore, and banned members, with Unban. */
-export function HiddenSection() {
-  const { data, isPending } = useHiddenList(true);
+function HiddenQueue({ section, title }: { section: 'items' | 'photos' | 'banned'; title: string }) {
+  const query = useHiddenList(true, section);
   const unban = useUnban();
   const run = useRun();
-  if (isPending) return <Loading />;
-  const items = data?.items ?? [];
-  const banned = data?.banned ?? [];
-  return (
-    <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-3" aria-labelledby="hidden-items">
-        <h2 id="hidden-items" className="text-lg font-extrabold">Hidden</h2>
-        {items.length
-          ? items.map((item) => <HiddenCard key={`${item.targetType}:${item.targetId}`} item={item} />)
-          : <EmptyState icon={EyeOff} line="Nothing is hidden." />}
-      </section>
-      <section className="flex flex-col gap-3" aria-labelledby="banned-members">
-        <h2 id="banned-members" className="text-lg font-extrabold">Banned members</h2>
-        {banned.length ? (
-          <ul className="flex flex-col">
-            {banned.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center gap-2 border-b border-line py-3 last:border-0">
-                <span className="min-w-0 flex-1 break-words">
-                  <span className="font-bold">{m.pseudonym}</span>
-                  <span className="block text-xs text-muted">Banned {when(m.bannedAt)}</span>
-                </span>
-                <Button size="md" variant="secondary" disabled={unban.isPending} onClick={() => void run(() => unban.mutateAsync(m.id), 'Unbanned. They can sign in again; their posts stay hidden until you restore them.')}>
-                  Unban
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-base text-muted">No banned members.</p>}
-      </section>
-    </div>
-  );
+  const items = query.data?.pages.flatMap(p => p.items) ?? [];
+  const banned = query.data?.pages.flatMap(p => p.banned) ?? [];
+  return <section className="flex flex-col gap-3" aria-label={title}>
+    <h2 className="text-lg font-extrabold">{title}</h2>
+    <RequestError query={query} />
+    {query.isPending ? <Loading /> : <>
+      {section === 'banned' ? <>
+        {!banned.length && !query.isError && <p className="text-base text-muted">No banned members.</p>}
+        {banned.map(m => <Card key={m.id} className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 flex-1 break-words"><span className="font-bold">{m.pseudonym}</span><span className="block text-xs text-muted">Banned {when(m.bannedAt)}</span></span>
+          <Button size="md" variant="secondary" disabled={unban.isPending} onClick={() => void run(() => unban.mutateAsync(m.id), 'Unbanned. Their posts stay hidden until you restore them.')}>Unban</Button>
+        </Card>)}
+      </> : <>
+        {!items.length && !query.isError && <EmptyState icon={EyeOff} line={section === 'photos' ? 'No hidden photos.' : 'Nothing is hidden.'} />}
+        {items.map(item => <HiddenCard key={`${item.targetType}:${item.targetId}`} item={item} />)}
+        {section === 'photos' && items.some(item => item.deletion?.pending) && <Button variant="secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry photo deletions</Button>}
+      </>}
+      <More query={query} />
+    </>}
+  </section>;
+}
+
+export function HiddenSection() {
+  return <div className="flex flex-col gap-6">
+    <HiddenQueue section="items" title="Hidden" />
+    <HiddenQueue section="banned" title="Banned members" />
+    <HiddenQueue section="photos" title="Hidden photos and deletion history" />
+  </div>;
 }
 
 // ---------- Claims ----------
 
 export function ClaimsTab() {
   const [all, setAll] = useState(false);
-  const { data, isPending } = useClaimQueue(true, all);
+  const query = useClaimQueue(true, all);
+  const claims = query.data?.pages.flatMap(p => p.claims) ?? [];
   const decide = useClaimDecision();
   const run = useRun();
   return (
@@ -190,27 +221,32 @@ export function ClaimsTab() {
         <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="size-5 accent-brand" />
         Show decided claims too
       </label>
-      {isPending ? <Loading /> : !data?.claims.length ? <EmptyState icon={ClipboardCheck} line="No claims waiting." /> : data.claims.map((c) => (
-        <Card key={c.id} className="flex flex-col gap-2">
-          <p data-testid="admin-claim-code" className="font-mono text-2xl font-extrabold tracking-widest">{c.code}</p>
-          <p className="text-base break-words">
-            <span className="font-bold">{c.claimant.pseudonym}</span> claims{' '}
-            <Link className="inline-flex min-h-11 items-center font-bold text-brand underline" to={`/${c.listing.kind === 'service' ? 'services' : c.listing.kind === 'product' ? 'products' : 'places'}/${c.listing.slug}`}>{c.listing.name}</Link>
-          </p>
-          <p className="text-xs text-muted">{when(c.createdAt)} · {c.status}</p>
-          <div className="flex flex-wrap gap-2">
-            {c.status === 'pending' && (
-              <>
-                <Button size="md" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'approve' }), 'Approved. They now run this listing.')}>Approve</Button>
-                <Button size="md" variant="secondary" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'reject' }), 'Rejected.')}>Reject</Button>
-              </>
-            )}
-            {c.status === 'approved' && (
-              <Button size="md" variant="danger" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'revoke' }), 'Ownership revoked.')}>Revoke ownership</Button>
-            )}
-          </div>
-        </Card>
-      ))}
+      {query.isPending ? <Loading /> : <>
+        <RequestError query={query} />
+        {!claims.length && !query.isError && <EmptyState icon={ClipboardCheck} line="No claims waiting." />}
+        {claims.map((c) => (
+          <Card key={c.id} className="flex flex-col gap-2">
+            <p data-testid="admin-claim-code" className="font-mono text-2xl font-extrabold tracking-widest">{c.code}</p>
+            <p className="text-base break-words">
+              <span className="font-bold">{c.claimant.pseudonym}</span> claims{' '}
+              <Link className="inline-flex min-h-11 items-center font-bold text-brand underline" to={`/${c.listing.kind === 'service' ? 'services' : c.listing.kind === 'product' ? 'products' : 'places'}/${c.listing.slug}`}>{c.listing.name}</Link>
+            </p>
+            <p className="text-xs text-muted">{when(c.createdAt)} · {c.status}</p>
+            <div className="flex flex-wrap gap-2">
+              {c.status === 'pending' && (
+                <>
+                  <Button size="md" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'approve' }), 'Approved. They now run this listing.')}>Approve</Button>
+                  <Button size="md" variant="secondary" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'reject' }), 'Rejected.')}>Reject</Button>
+                </>
+              )}
+              {c.status === 'approved' && (
+                <Button size="md" variant="danger" disabled={decide.isPending} onClick={() => void run(() => decide.mutateAsync({ id: c.id, decision: 'revoke' }), 'Ownership revoked.')}>Revoke ownership</Button>
+              )}
+            </div>
+          </Card>
+        ))}
+        <More query={query} />
+      </>}
     </div>
   );
 }
@@ -245,7 +281,8 @@ export function ListingsTab() {
   const [q, setQ] = useState('');
   const [survivor, setSurvivor] = useState<AdminListing | null>(null);
   const [loser, setLoser] = useState<AdminListing | null>(null);
-  const { data, isPending } = useAdminListings(true, q);
+  const query = useAdminListings(true, q);
+  const { data, isPending } = query;
   const merge = useMerge();
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
@@ -300,7 +337,8 @@ export function ListingsTab() {
         </Card>
       )}
 
-      {isPending ? <Loading /> : !data?.listings.length ? <p className="text-base text-muted">No listings match.</p> : (
+      <RequestError query={query} />
+      {isPending ? <Loading /> : !data?.listings.length ? !query.isError && <p className="text-base text-muted">No listings match.</p> : (
         <ul className="flex flex-col">
           {data.listings.map((l) => (
             <ListingRow key={l.id} l={l} picked={survivor?.id === l.id ? 'survivor' : loser?.id === l.id ? 'loser' : null} onPick={(role) => pick(l, role)} />
@@ -314,12 +352,15 @@ export function ListingsTab() {
 // ---------- Audit ----------
 
 export function AuditTab() {
-  const { data, isPending, fetchNextPage, hasNextPage, isFetchingNextPage } = useAuditLog(true);
+  const query = useAuditLog(true);
+  const { data, isPending, fetchNextPage, hasNextPage, isFetchingNextPage } = query;
   if (isPending) return <Loading />;
   const rows = data?.pages.flatMap((p) => p.rows) ?? [];
-  if (!rows.length) return <EmptyState icon={History} line="Nothing in the audit log yet." />;
+
   return (
     <div className="flex flex-col gap-2">
+      <RequestError query={query} />
+      {!rows.length && !query.isError && <EmptyState icon={History} line="Nothing in the audit log yet." />}
       <ul className="flex flex-col">
         {rows.map((r) => (
           <li key={r.id} className="flex flex-col gap-0.5 border-b border-line py-2 last:border-0">

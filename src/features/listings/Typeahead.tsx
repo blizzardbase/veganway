@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { Check, CircleAlert, Search, X } from 'lucide-react';
 import { Field, IconButton } from '../../ui';
 import { useSuggest } from './api';
-import { listingPath, type ListingKind, type ListingSuggestion } from '../../../shared/types/listings';
+import { areaLabel, listingPath, type ListingKind, type ListingSuggestion } from '../../../shared/types/listings';
 
 export function useDebounced<T>(value: T, ms = 250): T {
   const [out, setOut] = useState(value);
@@ -17,7 +17,7 @@ export function useDebounced<T>(value: T, ms = 250): T {
 }
 
 function where(s: ListingSuggestion): string {
-  return s.kind === 'product' ? s.stores.join(', ') : s.area ?? '';
+  return s.kind === 'product' ? s.stores.join(', ') : s.area ? areaLabel(s.area) : '';
 }
 
 /** "Already here, add your recommendation": matches for the name being typed. */

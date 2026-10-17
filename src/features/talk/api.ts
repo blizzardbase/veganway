@@ -112,9 +112,13 @@ export function usePin(topicId: string) {
 }
 
 export function useReplies(type: ReplyTargetType, id: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: talkKeys.replies(type, id),
-    queryFn: () => api.get<RepliesResponse>(`/api/talk/replies?target_type=${type}&target_id=${encodeURIComponent(id)}`),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => api.get<RepliesResponse>(
+      `/api/talk/replies?target_type=${type}&target_id=${encodeURIComponent(id)}${pageParam ? `&cursor=${pageParam}` : ''}`,
+    ),
+    getNextPageParam: (last) => last.nextCursor,
   });
 }
 
@@ -127,23 +131,43 @@ export function useCreateReply(type: ReplyTargetType, id: string) {
   return useMutation({
     mutationFn: (body: Omit<CreateReplyBody, 'targetType' | 'targetId'>) =>
       api.post<ReplyResponse>('/api/talk/replies', { ...body, targetType: type, targetId: id }),
-    onSuccess: async () => {
+    onSuccess: async ({ reply }) => {
+      const key = talkKeys.replies(type, id);
+      await qc.cancelQueries({ queryKey: key });
       bumpReplyCount(qc, type, id, 1);
-      await qc.invalidateQueries({ queryKey: talkKeys.replies(type, id) });
+      if (!qc.getQueryData(key)) {
+        await qc.invalidateQueries({ queryKey: key });
+        return;
+      }
+      // Keep the confirmed reply in the loaded pages, even when its chronological page is not loaded.
+      qc.setQueryData<InfiniteData<RepliesResponse>>(key, (data) => data && {
+        ...data,
+        pages: data.pages.map((page, index) => ({
+          ...page,
+          total: page.total + 1,
+          items: reply.parentId
+            ? page.items.map(thread => thread.id === reply.parentId
+              ? { ...thread, replies: [...thread.replies, reply] } : thread)
+            : index === data.pages.length - 1 ? [...page.items, { ...reply, replies: [] }] : page.items,
+        })),
+      });
     },
   });
 }
 
 export function useReplyUpvote(type: ReplyTargetType, id: string) {
   const qc = useQueryClient();
-  const flip = (replyId: string, to?: UpvoteResponse) => qc.setQueryData<RepliesResponse>(talkKeys.replies(type, id), (data) => data && {
+  const flip = (replyId: string, to?: UpvoteResponse) => qc.setQueryData<InfiniteData<RepliesResponse>>(talkKeys.replies(type, id), (data) => data && {
     ...data,
-    items: data.items.map((thread) => {
-      const one = <T extends { id: string; upvoted: boolean; upvotes: number }>(r: T): T => (r.id !== replyId ? r
-        : to ? { ...r, upvoted: to.upvoted, upvotes: to.upvotes }
-          : { ...r, upvoted: !r.upvoted, upvotes: r.upvotes + (r.upvoted ? -1 : 1) });
-      return { ...one(thread), replies: thread.replies.map(one) };
-    }),
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.map((thread) => {
+        const one = <T extends { id: string; upvoted: boolean; upvotes: number }>(r: T): T => (r.id !== replyId ? r
+          : to ? { ...r, upvoted: to.upvoted, upvotes: to.upvotes }
+            : { ...r, upvoted: !r.upvoted, upvotes: r.upvotes + (r.upvoted ? -1 : 1) });
+        return { ...one(thread), replies: thread.replies.map(one) };
+      }),
+    })),
   });
   return useMutation({
     mutationFn: (replyId: string) => api.post<UpvoteResponse>(`/api/talk/replies/${replyId}/upvote`),

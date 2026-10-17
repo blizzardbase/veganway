@@ -68,7 +68,7 @@ export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<{ ok: true }>('/api/auth/logout'),
-    onSettled: () => {
+    onSuccess: () => {
       setCsrf(null);
       qc.clear();
       qc.setQueryData<MeResponse>(meKey, { user: null, csrf: null });

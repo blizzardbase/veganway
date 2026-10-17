@@ -180,7 +180,7 @@ const CARD_SELECT = `
          coalesce(o.rec, 0) AS rec, coalesce(o.nfm, 0) AS nfm,
          (SELECT count(*) FROM recommendations r WHERE r.listing_id = l.id AND ${ACTIVE_OFFER}) AS offers
   FROM listings l
-  LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL
+  LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL AND NOT p.hidden
   LEFT JOIN LATERAL (
     SELECT count(*) FILTER (WHERE value = 'recommend') AS rec, count(*) FILTER (WHERE value = 'not_for_me') AS nfm
     FROM opinions WHERE listing_id = l.id
@@ -241,7 +241,7 @@ async function findListing(db: Queryable, slug: string, user: SessionUser | null
 async function activeOffers(db: Queryable, listingId: string): Promise<ActiveOffer[]> {
   const rows = await db.query<AuthorRow & { id: string; offer: string; offer_expires_at: Date; created_at: Date }>(
     `SELECT r.id, r.offer, r.offer_expires_at, r.created_at, ${authorCols('u', 'ap', 'a_')}
-     FROM recommendations r JOIN users u ON u.id = r.user_id LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL
+     FROM recommendations r JOIN users u ON u.id = r.user_id LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden
      WHERE r.listing_id = $1 AND ${ACTIVE_OFFER}
      ORDER BY r.created_at DESC LIMIT 10`,
     [listingId],
@@ -269,7 +269,7 @@ async function creatorMayEdit(db: Queryable, row: CardRow, user: SessionUser | n
 
 async function loadDetail(db: Queryable, row: CardRow, user: SessionUser | null): Promise<ListingDetail> {
   const author = await db.one<AuthorRow>(
-    `SELECT ${authorCols('u', 'ap', 'a_')} FROM users u LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL WHERE u.id = $1`,
+    `SELECT ${authorCols('u', 'ap', 'a_')} FROM users u LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden WHERE u.id = $1`,
     [row.created_by],
   );
   let myOpinion: OpinionValue | null = null;
@@ -309,7 +309,7 @@ async function opinionCounts(db: Queryable, listingId: string, userId: string): 
 
 /** A photo the member uploaded and has not deleted. */
 async function ownPhoto(db: Queryable, id: string, userId: string): Promise<void> {
-  const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL', [id, userId]);
+  const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND NOT hidden', [id, userId]);
   if (!ok) fail(400, 'That photo is not available. Please add it again.', 'bad_photo', 'photoId');
 }
 
@@ -333,8 +333,8 @@ const REC_SELECT = `
          ${authorCols('u', 'ap', 'a_')}
   FROM recommendations r
   JOIN users u ON u.id = r.user_id
-  LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL
-  LEFT JOIN photos p ON p.id = r.photo_id AND p.deleted_at IS NULL`;
+  LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden
+  LEFT JOIN photos p ON p.id = r.photo_id AND p.deleted_at IS NULL AND NOT p.hidden`;
 
 function toRecommendation(r: RecRow, user: SessionUser | null): Recommendation {
   return {
@@ -374,7 +374,7 @@ export function router(deps: Deps): Router {
     };
     if (!isAdmin(user)) where.push('NOT l.hidden');
     if (q.kind) add((n) => `l.kind = ${n}`, q.kind);
-    if (q.area) add((n) => `l.area = ${n}`, q.area);
+    if (q.area) add((n) => `(l.area = ${n} OR (l.kind = 'service' AND l.area = 'Delivery only'))`, q.area);
     if (q.vegan_status) add((n) => `l.vegan_status = ${n}`, q.vegan_status);
     if (q.category) add((n) => `l.category = ${n}`, q.category);
     if (q.store) add((n) => `${n} = ANY (l.stores)`, q.store);
@@ -383,7 +383,7 @@ export function router(deps: Deps): Router {
     }
     const order = q.sort === 'new'
       ? 'l.created_at DESC, l.id DESC'
-      : '(coalesce(o.rec, 0) - coalesce(o.nfm, 0)) DESC, coalesce(o.rec, 0) DESC, l.created_at DESC, l.id DESC';
+      : 'coalesce(o.rec, 0) DESC, (coalesce(o.rec, 0) - coalesce(o.nfm, 0)) DESC, l.created_at DESC, l.id DESC';
     const size = Math.min(Math.max(Number(q.limit ?? PAGE_SIZE), 1), 50);
     const offset = Number(q.cursor ?? 0);
     params.push(size + 1, offset);
@@ -444,8 +444,8 @@ export function router(deps: Deps): Router {
        FROM recommendations r
        JOIN listings l ON l.id = r.listing_id AND NOT l.hidden
        JOIN users u ON u.id = r.user_id
-       LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL
-       LEFT JOIN photos lp ON lp.id = l.photo_id AND lp.deleted_at IS NULL
+       LEFT JOIN photos ap ON ap.id = u.avatar_photo_id AND ap.deleted_at IS NULL AND NOT ap.hidden
+       LEFT JOIN photos lp ON lp.id = l.photo_id AND lp.deleted_at IS NULL AND NOT lp.hidden
        WHERE ${ACTIVE_OFFER}
        ORDER BY r.created_at DESC
        LIMIT 20`,
@@ -465,7 +465,12 @@ export function router(deps: Deps): Router {
 
   r.get('/listings/:slug', async (req, res) => {
     const user = viewer(res);
-    const row = await findListing(db, String(req.params.slug), user);
+    const resolved = await db.maybeOne<{ slug: string }>(
+      `WITH RECURSIVE chain AS (
+         SELECT id, slug, merged_into_id FROM listings WHERE slug = $1
+         UNION ALL SELECT l.id, l.slug, l.merged_into_id FROM listings l JOIN chain c ON l.id = c.merged_into_id
+       ) SELECT slug FROM chain WHERE merged_into_id IS NULL`, [String(req.params.slug)]);
+    const row = await findListing(db, resolved?.slug ?? String(req.params.slug), user);
     res.json({ listing: await loadDetail(db, row, user) });
   });
 

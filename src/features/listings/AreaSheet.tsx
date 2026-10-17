@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { Chip, INPUT_FOCUS, Sheet } from '../../ui';
-import { DUBAI_AREAS } from '../../../shared/types/listings';
+import { areaLabel, DUBAI_AREAS } from '../../../shared/types/listings';
 
 /** The six areas most places are in, as quick chips on the Add place form. Value, then short label. */
 export const POPULAR_AREAS: { value: (typeof DUBAI_AREAS)[number]; label: string }[] = [
@@ -28,7 +28,7 @@ export function AreaSheet({ open, onClose, value, onPick, options = DUBAI_AREAS,
 }) {
   const [q, setQ] = useState('');
   const needle = q.trim().toLowerCase();
-  const shown = needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options;
+  const shown = needle ? options.filter((o) => areaLabel(o).toLowerCase().includes(needle)) : options;
   const pick = (area: string | null) => {
     setQ('');
     onPick(area);
@@ -52,7 +52,7 @@ export function AreaSheet({ open, onClose, value, onPick, options = DUBAI_AREAS,
         <div className="flex flex-wrap gap-2">
           {allowAny && !needle && <Chip selected={!value} onClick={() => pick(null)}>Any</Chip>}
           {shown.map((o) => (
-            <Chip key={o} selected={value === o} onClick={() => pick(o)}>{o}</Chip>
+            <Chip key={o} selected={value === o} onClick={() => pick(o)}>{areaLabel(o)}</Chip>
           ))}
           {shown.length === 0 && <p className="px-1 py-2 text-sm text-muted">No area matches “{q.trim()}”.</p>}
         </div>

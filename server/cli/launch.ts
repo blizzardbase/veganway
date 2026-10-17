@@ -11,7 +11,7 @@ export const MAX_ACCOUNTS_FOR_RESET = 5;
 
 const CONTENT_TABLES = [
   'audit', 'reports', 'claims', 'bookmarks', 'replies', 'poll_votes', 'poll_options', 'topics',
-  'upvotes', 'opinions', 'recommendations', 'listings', 'photos', 'sessions', 'rate_limits',
+  'upvotes', 'opinions', 'recommendations', 'listings', 'media_deletions', 'photos', 'sessions', 'rate_limits',
 ];
 
 export async function resetForLaunch(db: Db): Promise<{ removedAccounts: number }> {

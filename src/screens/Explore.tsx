@@ -9,7 +9,7 @@ import { AreaSheet } from '../features/listings/AreaSheet';
 import { flatUnique, useListings, type ListingFilters } from '../features/listings/api';
 import { errorMessage } from '../api/client';
 import {
-  PLACE_CATEGORIES, PRODUCT_CATEGORIES, SERVICE_CATEGORIES, STORES, VEGAN_STATUS_LABEL,
+  areaLabel, PLACE_CATEGORIES, PRODUCT_CATEGORIES, SERVICE_CATEGORIES, STORES, VEGAN_STATUS_LABEL,
   type ListingKind, type ListingSort, type VeganStatus,
 } from '../../shared/types/listings';
 
@@ -96,7 +96,7 @@ export function Explore() {
           </Chip>
           {filters.kind !== 'product' && (
             <Chip selected={Boolean(filters.area)} onClick={() => setPicker('area')} icon={<ChevronDown size={16} aria-hidden="true" />}>
-              {filters.area ?? 'Area'}
+              {filters.area ? areaLabel(filters.area) : 'Area'}
             </Chip>
           )}
           {filters.kind === 'product' && (

@@ -9,7 +9,7 @@ const SERVICE = {
   name: 'Basil Bakes',
   summary: 'Vegan sourdough and birthday cakes, baked to order every weekend.',
   category: 'Home baker',
-  area: 'Delivers across Dubai',
+  area: 'Delivery only',
   contact: { whatsapp: '+971 50 123 4567', instagram: '@basilbakes', website: 'https://basilbakes.example' },
 };
 

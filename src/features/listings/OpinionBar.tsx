@@ -1,6 +1,8 @@
 // Recommend / Not for me. One tap, optimistic, with an Undo toast. Signed out visitors go to Join.
 // On a listing page they live in the one sticky bar at the bottom, beside "Add yours".
 import { useState } from 'react';
+import { useLocation } from 'react-router';
+import { useUser } from '../../api/session';
 import { Plus, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '../../ui';
 import { cx } from '../../lib/cx';
@@ -46,7 +48,11 @@ function useChoose(listing: OpinionListing) {
 export function ListingActionBar({ listing, name }: { listing: OpinionListing; name: string }) {
   const choose = useChoose(listing);
   const requireAccount = useRequireAccount();
+  const location = useLocation();
+  const user = useUser();
   const [composing, setComposing] = useState(false);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const fromDuplicate = location.hash === '#recommend' && dismissed !== location.key;
 
   // The recommend count already shows in the page body (OpinionSummary), so the bar does not repeat it.
   const toggle = (value: OpinionValue, label: string, Icon: typeof ThumbsUp, count = 0) => {
@@ -79,6 +85,7 @@ export function ListingActionBar({ listing, name }: { listing: OpinionListing; n
           {toggle('recommend', 'Recommend', ThumbsUp)}
           {toggle('not_for_me', 'Not for me', ThumbsDown, listing.notForMeCount)}
           <button
+            id="recommend"
             type="button"
             onClick={() => requireAccount(() => setComposing(true))}
             className="ml-1 inline-flex h-12 flex-[1.4] items-center justify-center gap-1.5 rounded-input bg-brand px-3 text-sm font-extrabold text-on-brand shadow-1 transition active:scale-[0.98]"
@@ -88,7 +95,7 @@ export function ListingActionBar({ listing, name }: { listing: OpinionListing; n
           </button>
         </div>
       </div>
-      <RecommendationSheet slug={listing.slug} listingName={name} open={composing} onClose={() => setComposing(false)} />
+      <RecommendationSheet slug={listing.slug} listingName={name} open={Boolean(user) && (composing || fromDuplicate)} onClose={() => { setComposing(false); setDismissed(location.key); }} />
     </>
   );
 }

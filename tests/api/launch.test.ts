@@ -33,6 +33,23 @@ describe('launch steps', () => {
     }
   });
 
+  test('review 9: reset removes photo deletion work before photos and handles merged listing references', async () => {
+    const app = await makeTestApp();
+    try {
+      const member = await signUp(app.agent());
+      const photo = await app.db.one<{ id: string }>(`INSERT INTO photos (user_id,blob_path,width,height,deleted_at)
+        VALUES ($1,'synthetic-reset.jpg',1,1,now()) RETURNING id`, [member.user.id]);
+      await app.db.query('UPDATE users SET avatar_photo_id=$1 WHERE id=$2', [photo.id, member.user.id]);
+      const listings = await app.db.query<{ id: string }>(`INSERT INTO listings (kind,name,slug,vegan_status,created_by,photo_id)
+        SELECT 'place','Reset '||n,'reset-'||n,'fully_vegan',$1,$2 FROM generate_series(1,2) n RETURNING id`, [member.user.id, photo.id]);
+      await app.db.query('UPDATE listings SET hidden=true,merged_into_id=$2 WHERE id=$1', [listings[0].id, listings[1].id]);
+      assert.deepEqual(await resetForLaunch(app.db), { removedAccounts: 1 });
+      for (const table of ['photos', 'media_deletions', 'listings']) {
+        assert.equal((await app.db.one<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).n, 0, table);
+      }
+    } finally { await app.close(); }
+  });
+
   test('reset refuses once a real community exists', async () => {
     const app = await makeTestApp();
     try {

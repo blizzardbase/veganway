@@ -211,8 +211,11 @@ describe('admin', () => {
 
   test('listing search includes hidden listings, and the audit log names the acting admin', async () => {
     const admin = await asAdmin(app);
+    const hiddenId = await insertListing(app, admin.user.id, 'Leafy Hidden');
+    await admin.agent.post('/api/admin/moderate', { targetType: 'listing', targetId: hiddenId, action: 'hide' });
     const found = await admin.agent.get<{ listings: { name: string }[] }>('/api/admin/listings?q=leafy');
-    assert.ok(found.body.listings.some((l) => l.name === 'Leafy Bowls'), 'hidden listings appear for admins');
+    assert.ok(found.body.listings.some((l) => l.name === 'Leafy Hidden'), 'hidden listings appear for admins');
+    assert.ok(!found.body.listings.some((l) => l.name === 'Leafy Bowls'), 'merged listings cannot be selected again');
     const id = await insertListing(app, admin.user.id, 'Audit Me');
     assert.equal((await admin.agent.post('/api/admin/moderate', { targetType: 'listing', targetId: id, action: 'hide' })).status, 200);
     const log = await admin.agent.get<{ rows: { action: string; actor: string | null; targetId: string | null }[] }>('/api/admin/audit');

@@ -154,10 +154,11 @@ export interface ReplyThread extends Reply {
   replies: Reply[];
 }
 
-/** GET /api/talk/replies?target_type=&target_id= */
+/** GET /api/talk/replies?target_type=&target_id=&cursor=&limit=, paginated by top level thread. */
 export interface RepliesResponse {
   items: ReplyThread[];
   total: number;
+  nextCursor: string | null;
 }
 
 export interface CreateReplyBody {

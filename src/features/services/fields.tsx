@@ -1,7 +1,7 @@
 // Form pieces shared by the Add service form and the owner Edit sheet.
 import { Chip, ChipRow, Field } from '../../ui';
 import { SERVICE_AREAS, SERVICE_CATEGORIES, SERVICE_VEGAN_STATUSES, type ServiceCategory, type ServiceContactInput, type ServiceVeganStatus } from '../../../shared/types/services';
-import { VEGAN_STATUS_LABEL } from '../../../shared/types/listings';
+import { areaLabel, VEGAN_STATUS_LABEL } from '../../../shared/types/listings';
 
 export function CategoryChips({ value, onChange }: { value: ServiceCategory | null; onChange: (c: ServiceCategory) => void }) {
   return (
@@ -37,7 +37,7 @@ export function AreaChips({ value, onChange }: { value: string | null; onChange:
       <span className="text-sm font-bold">Area</span>
       <ChipRow label="Area">
         {SERVICE_AREAS.map((a) => (
-          <Chip key={a} selected={value === a} onClick={() => onChange(a)}>{a}</Chip>
+          <Chip key={a} selected={value === a} onClick={() => onChange(a)}>{areaLabel(a)}</Chip>
         ))}
       </ChipRow>
     </div>

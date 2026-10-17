@@ -3,11 +3,12 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ChevronLeft, ChefHat, Clock, MessagesSquare, Search as SearchIcon, SearchX, ShoppingBasket, Store, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { EmptyState, IconButton, INPUT_FOCUS, Monogram, Skeleton } from '../ui';
+import { Button, EmptyState, IconButton, INPUT_FOCUS, Monogram, Skeleton } from '../ui';
 import { membersRecommend, replyCount } from '../lib/counts';
 import { clearRecent, readRecent, rememberSearch, useSearch } from '../features/search/api';
 import { Highlight } from '../features/search/Highlight';
 import { VeganStatusTag } from '../features/listings/bits';
+import { areaLabel } from '../../shared/types/listings';
 import { SEARCH_MAX, SEARCH_TYPES, type ListingHit, type SearchGroup, type SearchType, type TopicHit } from '../../shared/types/search';
 
 const GROUPS: { type: SearchType; title: string; icon: LucideIcon }[] = [
@@ -33,7 +34,7 @@ function ListingRow({ hit, q, onOpen }: { hit: ListingHit; q: string; onOpen: ()
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-bold"><Highlight text={hit.name} query={q} /></span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-            {hit.area && <span>{hit.area}</span>}
+            {hit.area && <span>{areaLabel(hit.area)}</span>}
             <VeganStatusTag status={hit.veganStatus} />
             {hit.recommendCount > 0 && <span>{membersRecommend(hit.recommendCount)}</span>}
           </span>
@@ -114,7 +115,7 @@ export function Search() {
     return () => clearTimeout(t);
   }, [input, urlQ, type, setParams]);
 
-  const { data, isFetching, isPending, isError } = useSearch(urlQ, type);
+  const { data, isFetching, isPending, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage, refetch } = useSearch(urlQ, type);
   const q = data?.q ?? urlQ;
   const remember = () => setRecent(rememberSearch(urlQ));
 
@@ -198,8 +199,8 @@ export function Search() {
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
         </div>
-      ) : isError ? (
-        <EmptyState icon={SearchX} line="Search did not work. Please try again." />
+      ) : isError && !data ? (
+        <EmptyState icon={SearchX} line="Search did not work. Please try again." action={{ label: 'Retry', onClick: () => void refetch() }} />
       ) : total === 0 ? (
         <EmptyState icon={SearchX} line={`Nothing found for “${q}”. Add it so others can find it.`} action={{ label: 'Add a place', to: '/add/place' }} />
       ) : (
@@ -220,6 +221,16 @@ export function Search() {
               </Group>
             );
           })}
+          {type && (
+            <div className="flex flex-col gap-2">
+              {isFetchNextPageError && <p role="alert" className="text-sm text-muted">Could not load more results. Please try again.</p>}
+              {hasNextPage ? (
+                <Button variant="secondary" block busy={isFetchingNextPage} busyLabel="Loading" onClick={() => void fetchNextPage()}>
+                  {isFetchNextPageError ? 'Retry' : 'Load more'}
+                </Button>
+              ) : <p role="status" className="py-2 text-center text-sm text-muted">{data && data[type].items.length < data[type].total ? 'Refine your search to see more results.' : 'All results shown.'}</p>}
+            </div>
+          )}
         </div>
       )}
     </>

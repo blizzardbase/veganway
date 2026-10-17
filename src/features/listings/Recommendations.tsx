@@ -7,6 +7,7 @@ import { cx } from '../../lib/cx';
 import { ApiError, errorMessage } from '../../api/client';
 import { useRequireAccount } from '../auth/Gate';
 import { flatUnique, useCreateRecommendation, useRecommendations, useToggleUpvote } from './api';
+import { ReportButton } from './ReportSheet';
 import { PhotoPicker } from './PhotoPicker';
 import { formatDay } from './bits';
 import { BODY_MAX, type PhotoResponse, type Recommendation } from '../../../shared/types/listings';
@@ -58,6 +59,10 @@ function RecommendationItem({ rec, slug, byCreator }: { rec: Recommendation; slu
         </p>
       )}
       {rec.photoUrl && <img src={rec.photoUrl} alt="" loading="lazy" decoding="async" className="max-h-80 w-full rounded-input bg-surface-2 object-cover" />}
+      <div className="-my-1 -ml-3 flex flex-wrap gap-1">
+        {!rec.mine && <ReportButton targetType="recommendation" targetId={rec.id} variant="text" />}
+        {rec.photoUrl && <ReportButton targetType="photo" photoUrl={rec.photoUrl} variant="text" />}
+      </div>
     </article>
   );
 }

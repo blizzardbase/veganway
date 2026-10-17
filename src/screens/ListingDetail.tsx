@@ -12,7 +12,7 @@ import { ListingActionBar, OpinionSummary } from '../features/listings/OpinionBa
 import { Recommendations } from '../features/listings/Recommendations';
 import { ReportButton } from '../features/listings/ReportSheet';
 import { ListingTalk } from '../features/listings/TalkSlots';
-import { listingPath, type ListingDetail as Detail } from '../../shared/types/listings';
+import { areaLabel, listingPath, type ListingDetail as Detail } from '../../shared/types/listings';
 
 /** A plain wa.me link: no script, no tracking. */
 export function whatsappShareUrl(name: string, url: string): string {
@@ -63,7 +63,7 @@ export function ListingDetail() {
   if (l.kind === 'service') return <Navigate to={listingPath(l)} replace />;
 
   const url = typeof window === 'undefined' ? listingPath(l) : `${window.location.origin}${listingPath(l)}`;
-  const where = l.kind === 'product' ? l.stores.join(', ') : l.area;
+  const where = l.kind === 'product' ? l.stores.join(', ') : l.area ? areaLabel(l.area) : null;
   const offerPath = `/add/offer?listing=${encodeURIComponent(l.slug)}`;
 
   return (
@@ -89,7 +89,10 @@ export function ListingDetail() {
       />
 
       <article className="flex flex-col gap-5">
-        <HeroMedia name={l.name} category={l.category} kind={l.kind} photoUrl={l.photoUrl} className="-mt-2" />
+        <div data-testid="listing-photo">
+          <HeroMedia name={l.name} category={l.category} kind={l.kind} photoUrl={l.photoUrl} className="-mt-2" />
+          {l.photoUrl && <div className="flex justify-end"><ReportButton targetType="photo" photoUrl={l.photoUrl} variant="text" /></div>}
+        </div>
 
         <header className="flex flex-col gap-2">
           <h1 className="text-[28px] leading-[34px] font-extrabold break-words">{l.name}</h1>
@@ -135,9 +138,10 @@ export function ListingDetail() {
                 {l.offers.map((o) => (
                   <li key={o.recommendationId} className="flex items-start gap-2 rounded-card bg-saffron p-4 text-on-saffron">
                     <TagIcon size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold break-words">{o.offer}</p>
                       <p className="text-sm">Until {formatDay(o.offerExpiresAt)} · shared by {o.author.displayName || o.author.pseudonym}</p>
+                      <ReportButton targetType="recommendation" targetId={o.recommendationId} variant="text" />
                     </div>
                   </li>
                 ))}

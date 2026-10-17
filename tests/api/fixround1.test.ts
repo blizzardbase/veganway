@@ -206,7 +206,7 @@ describe('4. photo bytes are deleted', () => {
     }
   });
 
-  test('an auto hide by reports deletes the bytes', async () => {
+  test('an auto hide by reports retains bytes until an admin decides', async () => {
     const app = await makeTestApp();
     try {
       const a = await signUp(app.agent());
@@ -217,7 +217,10 @@ describe('4. photo bytes are deleted', () => {
       await report(r2, 'photo', p.body.id);
       assert.ok(existsSync(file));
       assert.equal((await report(r3, 'photo', p.body.id)).hidden, true);
-      assert.equal(existsSync(file), false);
+      assert.equal(existsSync(file), true);
+      const held = await app.db.one<{ hidden: boolean; deleted_at: Date | null }>('SELECT hidden,deleted_at FROM photos WHERE id=$1', [p.body.id]);
+      assert.equal(held.hidden, true);
+      assert.equal(held.deleted_at, null);
     } finally {
       await app.close();
     }
@@ -344,18 +347,22 @@ describe('5. dismiss and the Hidden list', () => {
       const res = await admin.agent.get<{ items: { targetType: string; targetId: string; restorable: boolean }[]; banned: { id: string; pseudonym: string }[] }>('/api/admin/hidden');
       assert.equal(res.status, 200);
       const has = (type: string, id: string) => res.body.items.find((i) => i.targetType === type && i.targetId === id);
-      for (const [type, id] of [['listing', l.id], ['recommendation', rec.body.recommendation.id], ['topic', t.body.topic.id], ['reply', rep.body.reply.id], ['photo', p.body.id], ['user', a.user.id]] as const) {
+      for (const [type, id] of [['listing', l.id], ['recommendation', rec.body.recommendation.id], ['topic', t.body.topic.id], ['reply', rep.body.reply.id], ['user', a.user.id]] as const) {
         assert.ok(has(type, id), `${type} listed`);
       }
-      assert.equal(has('photo', p.body.id)!.restorable, false, 'a photo whose bytes are gone cannot come back');
+      assert.equal(has('photo', p.body.id), undefined, 'deleted photo history stays separate from restorable items');
+      const photos = await admin.agent.get<typeof res.body>('/api/admin/hidden?section=photos');
+      assert.equal(photos.body.items.find((i) => i.targetId === p.body.id)?.restorable, false, 'a deleted photo cannot come back');
       assert.equal(has('listing', l.id)!.restorable, true);
-      assert.ok(res.body.banned.some((m) => m.id === banned.user.id));
+      const bans = await admin.agent.get<typeof res.body>('/api/admin/hidden?section=banned');
+      assert.ok(bans.body.banned.some((m) => m.id === banned.user.id));
 
       await admin.agent.post('/api/admin/moderate', { targetType: 'listing', targetId: l.id, action: 'restore' });
       assert.equal((await admin.agent.post(`/api/admin/users/${banned.user.id}/unban`)).status, 200);
       const after = await admin.agent.get<{ items: { targetId: string }[]; banned: { id: string }[] }>('/api/admin/hidden');
       assert.ok(!after.body.items.some((i) => i.targetId === l.id));
-      assert.ok(!after.body.banned.some((m) => m.id === banned.user.id));
+      const bansAfter = await admin.agent.get<typeof res.body>('/api/admin/hidden?section=banned');
+      assert.ok(!bansAfter.body.banned.some((m) => m.id === banned.user.id));
       const restorePhoto = await admin.agent.post('/api/admin/moderate', { targetType: 'photo', targetId: p.body.id, action: 'restore' });
       assert.equal(restorePhoto.status, 409);
     } finally {

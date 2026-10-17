@@ -13,9 +13,9 @@ const INPUT = 'h-12 w-full rounded-input border bg-surface px-4 text-base text-i
 /** Remove chip for a chosen tag or listing. */
 function Picked({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <li className="inline-flex h-11 items-center gap-1 rounded-full bg-brand-soft pr-0 pl-4 text-sm font-bold text-brand">
-      <span className="max-w-[16rem] truncate">{label}</span>
-      <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="inline-flex size-11 items-center justify-center rounded-full hover:bg-surface">
+    <li className="inline-flex h-11 min-w-0 max-w-full items-center gap-1 rounded-full bg-brand-soft pr-0 pl-4 text-sm font-bold text-brand">
+      <span className="min-w-0 max-w-[16rem] truncate" title={label}>{label}</span>
+      <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-surface">
         <X size={16} aria-hidden="true" />
       </button>
     </li>

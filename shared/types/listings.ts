@@ -21,7 +21,7 @@ export function veganStatusLabel(status: string): string | null {
 /** The error when a place or service has no status chosen. */
 export const VEGAN_STATUS_REQUIRED = `Choose ${VEGAN_STATUS_LABEL.fully_vegan} or ${VEGAN_STATUS_LABEL.vegan_options}.`;
 
-/** About 20 Dubai areas plus "Delivery only". A place's area must be one of these. */
+/** Canonical area values for places, services, imports and Explore. */
 export const DUBAI_AREAS = [
   'Downtown Dubai',
   'Business Bay',
@@ -44,8 +44,17 @@ export const DUBAI_AREAS = [
   'Mirdif',
   'Silicon Oasis',
   'Arabian Ranches',
+  'Motor City',
+  'Satwa',
   'Delivery only',
 ] as const;
+
+export type DubaiArea = (typeof DUBAI_AREAS)[number];
+
+/** Labels can change without changing stored area values. */
+export function areaLabel(area: string): string {
+  return area === 'Delivery only' ? 'Delivers across Dubai' : area;
+}
 
 export const STORES = ['Carrefour', 'Spinneys', 'Waitrose', 'Lulu', 'Kibsons', 'Choithrams', 'Online', 'Other'] as const;
 
@@ -177,7 +186,7 @@ export interface CreateListingBody {
   summary?: string;
   /** Optional first recommendation: what to order or buy. */
   whatToOrder?: string;
-  /** The creator's own opinion. Preselected as recommend in the form. Null records none. */
+  /** The creator's own opinion. The form starts unselected. Null records none. */
   opinion?: OpinionValue | null;
   mapsUrl?: string;
   photoId?: string;

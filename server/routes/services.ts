@@ -12,7 +12,7 @@ import { rejectContact } from '../lib/contact.js';
 import { fail, parse } from '../lib/http.js';
 import { VEGAN_STATUS_REQUIRED } from '../../shared/types/listings.js';
 import {
-  SERVICE_CATEGORIES, SERVICE_NAME_MAX, SERVICE_VEGAN_STATUSES, SERVICE_SUMMARY_MAX,
+  SERVICE_AREAS, SERVICE_CATEGORIES, SERVICE_NAME_MAX, SERVICE_VEGAN_STATUSES, SERVICE_SUMMARY_MAX,
   type ClaimResponse, type MyClaim, type ServiceContact, type ServiceCreated, type ServiceProfile,
 } from '../../shared/types/services.js';
 
@@ -88,7 +88,7 @@ const summary = z.string({ error: 'Say what you offer.' }).trim()
   .min(10, { error: 'Say a little more about what you offer.' })
   .max(SERVICE_SUMMARY_MAX, { error: `Use at most ${SERVICE_SUMMARY_MAX} characters.` });
 const category = z.enum(SERVICE_CATEGORIES, { error: 'Pick a category.' });
-const area = z.string({ error: 'Pick an area.' }).trim().min(2, { error: 'Pick an area.' }).max(60, { error: 'That area name is too long.' });
+const area = z.enum(SERVICE_AREAS, { error: 'Pick an area from the list.' });
 const photoId = z.union([uuid, z.null()]).optional();
 // A service says itself whether everything is vegan. When a client leaves it out, store the
 // modest claim, never "Fully vegan".
@@ -113,7 +113,7 @@ function slugSuffix(): string {
 
 async function assertOwnPhoto(db: Queryable, userId: string, id: string | null | undefined): Promise<void> {
   if (!id) return;
-  const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL', [id, userId]);
+  const ok = await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND NOT hidden', [id, userId]);
   if (!ok) fail(400, 'That photo was not found. Please add it again.', 'invalid_input', 'photoId');
 }
 
@@ -186,11 +186,16 @@ export function router(deps: Deps): Router {
   r.get('/services/:slug', async (req, res) => {
     const viewer = res.locals.session?.user ?? null;
     const isAdmin = viewer?.role === 'admin';
+    const resolved = await db.maybeOne<{ slug: string }>(
+      `WITH RECURSIVE chain AS (
+         SELECT id, slug, merged_into_id FROM listings WHERE slug = $1
+         UNION SELECT l.id, l.slug, l.merged_into_id FROM listings l JOIN chain c ON l.id = c.merged_into_id
+       ) SELECT slug FROM chain WHERE merged_into_id IS NULL`, [String(req.params.slug)]);
     const row = await db.maybeOne<ListingRow>(
       `SELECT l.id, l.kind, l.name, l.slug, l.category, l.area, l.vegan_status, l.summary, l.photo_id, p.blob_path, l.owner_user_id, l.contact, l.created_at, l.hidden
-       FROM listings l LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL
+       FROM listings l LEFT JOIN photos p ON p.id = l.photo_id AND p.deleted_at IS NULL AND NOT p.hidden
        WHERE l.slug = $1`,
-      [String(req.params.slug)],
+      [resolved?.slug ?? String(req.params.slug)],
     );
     if (!row || (row.hidden && !isAdmin)) fail(404, 'This service was not found.', 'not_found');
 

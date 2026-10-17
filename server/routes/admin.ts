@@ -2,10 +2,10 @@
 // Mounted at /api. This router owns:
 //   GET  /admin/reports                    open reports grouped by target, with a preview; auto hidden first
 //   POST /admin/moderate                   hide, restore or dismiss one target (dismiss shows an auto hidden one again)
-//   GET  /admin/hidden                     everything hidden now, and banned members, for Restore and Unban
+//   GET  /admin/hidden?cursor=             restorable items; ?section=photos|banned selects separate history or members
 //   POST /admin/users/:id/ban | /unban     ban: banned_at, sessions deleted, content hidden, photos deleted,
 //                                          opinions and upvotes removed
-//   GET  /admin/claims                     claims queue (?status=pending|all)
+//   GET  /admin/claims?cursor=             claims queue (?status=pending|all)
 //   POST /admin/claims/:id/approve | /reject | /revoke
 //   POST /admin/listings/:id/revoke-owner
 //   GET  /admin/listings?q=                find listings, hidden included, for merging
@@ -19,12 +19,12 @@ import type { Queryable } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { currentUser, requireAdmin } from '../lib/auth.js';
 import { fail, parse } from '../lib/http.js';
-import { deleteMedia } from '../lib/media.js';
+import { deleteMedia, retryMediaDeletions } from '../lib/media.js';
 import { isHidden, lastHideWasAuto, photoBlobPath, previewTarget, setHidden } from './reports.js';
 import {
   REPORT_TARGETS,
-  type AdminClaim, type AdminListings, type AuditPage, type ClaimQueue, type HiddenItem, type HiddenList, type MergeResult, type ReportGroup, type ReportQueue,
-  type ReportReason, type ReportTarget,
+  type AdminClaim, type AdminListings, type AuditPage, type ClaimQueue, type HiddenItem, type HiddenList, type MergeResult, type ReportQueue,
+  type ReportReason, type ReportTarget, type TargetPreview,
 } from '../../shared/types/admin.js';
 
 const uuid = z.uuid({ error: 'That item was not found.' });
@@ -34,6 +34,41 @@ const moderateBody = z.object({
   action: z.enum(['hide', 'restore', 'dismiss'], { error: 'Unknown action.' }),
 });
 const mergeBody = z.object({ survivorId: uuid, loserId: uuid });
+
+const PAGE_SIZE = 50;
+const cursorSchema = z.object({
+  at: z.string().refine((value) => !Number.isNaN(Date.parse(value))),
+  id: z.uuid(), type: z.enum(REPORT_TARGETS).default('listing'),
+  urgent: z.boolean().default(false), count: z.number().int().nonnegative().default(0),
+});
+function readCursor(value: unknown) {
+  if (value === undefined) return null;
+  try { return cursorSchema.parse(JSON.parse(Buffer.from(z.string().parse(value), 'base64url').toString())); }
+  catch { fail(400, 'That page is not valid. Refresh and try again.', 'invalid_cursor'); }
+}
+const cursor = (value: z.input<typeof cursorSchema>) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const latestJoin = `LEFT JOIN LATERAL (
+  SELECT action FROM audit WHERE target_type = t.target_type AND target_id = t.id::text
+  AND action IN ('report.auto_hide','moderation.hide','moderation.restore')
+  ORDER BY created_at DESC, id DESC LIMIT 1
+) a ON true`;
+
+async function queuePreviews(q: Queryable, targets: { target_type: ReportTarget; target_id: string }[]) {
+  const rows = await q.query<{ target_type: ReportTarget; id: string; title: string; body: string | null; path: string | null; hidden: boolean; author: string; author_id: string; auto_hidden: boolean }>(
+    `SELECT t.*, coalesce(t.hidden AND a.action = 'report.auto_hide',false) AS auto_hidden
+     FROM moderation_targets t JOIN jsonb_to_recordset($1::jsonb) AS wanted(target_type text, target_id uuid)
+       ON t.target_type = wanted.target_type AND t.id = wanted.target_id ${latestJoin}`, [JSON.stringify(targets)]);
+  return new Map(rows.map((x) => {
+    const text = x.body?.replace(/\s+/g, ' ').trim();
+    const preview: TargetPreview = {
+      title: x.title,
+      excerpt: text ? text.length > 160 ? `${text.slice(0, 159)}…` : text : null,
+      path: x.path, hidden: x.hidden, author: x.author, authorId: x.author_id, exists: true,
+    };
+    return [`${x.target_type}:${x.id}`, { preview, autoHidden: x.auto_hidden }] as const;
+  }));
+}
+const missingPreview: TargetPreview = { title: 'Removed item', excerpt: null, path: null, hidden: false, author: null, authorId: null, exists: false };
 
 async function resolveReports(q: Queryable, type: ReportTarget, id: string): Promise<number> {
   const rows = await q.query('UPDATE reports SET resolved_at = now() WHERE target_type = $1 AND target_id = $2 AND resolved_at IS NULL RETURNING id', [type, id]);
@@ -67,38 +102,41 @@ export function router(deps: Deps): Router {
   const r = Router();
   const { db } = deps;
 
-  r.use('/admin', requireAdmin);
+  r.use('/admin', requireAdmin, (_req, res, next) => {
+    res.once('finish', () => { void retryMediaDeletions(db, deps.media); });
+    next();
+  });
 
   // ---------- reports ----------
 
-  r.get('/admin/reports', async (_req, res) => {
-    const groups = await db.query<{ target_type: ReportTarget; target_id: string; open_count: number; last_at: Date; reasons: { reason: ReportReason; count: number }[]; notes: string[] | null }>(
-      `SELECT g.target_type, g.target_id, g.open_count, g.last_at, g.notes,
-              (SELECT json_agg(json_build_object('reason', x.reason, 'count', x.n) ORDER BY x.n DESC)
-               FROM (SELECT reason, count(*)::int AS n FROM reports
-                     WHERE target_type = g.target_type AND target_id = g.target_id AND resolved_at IS NULL GROUP BY reason) x) AS reasons
-       FROM (SELECT target_type, target_id, count(*) AS open_count, max(created_at) AS last_at,
-                    (array_agg(note ORDER BY created_at DESC) FILTER (WHERE note IS NOT NULL))[1:3] AS notes
-             FROM reports WHERE resolved_at IS NULL GROUP BY target_type, target_id) g
-       ORDER BY g.open_count DESC, g.last_at DESC LIMIT 100`,
-    );
-    const out: ReportGroup[] = [];
-    for (const g of groups) {
-      const preview = await previewTarget(db, g.target_type, g.target_id);
-      out.push({
-        targetType: g.target_type,
-        targetId: g.target_id,
-        openCount: g.open_count,
-        reasons: g.reasons ?? [],
-        notes: g.notes ?? [],
-        lastReportedAt: g.last_at.toISOString(),
-        preview,
-        autoHidden: preview.hidden && (await lastHideWasAuto(db, g.target_type, g.target_id)),
-      });
-    }
-    // Items reports hid on their own need an admin first: they may be a real review someone buried.
-    out.sort((a, b) => Number(b.autoHidden) - Number(a.autoHidden));
-    const body: ReportQueue = { groups: out };
+  r.get('/admin/reports', async (req, res) => {
+    const c = readCursor(req.query.cursor);
+    const rows = await db.query<{ target_type: ReportTarget; target_id: string; open_count: number; last_at: Date; cursor_at: string; auto_hidden: boolean; reasons: { reason: ReportReason; count: number }[]; notes: string[] | null }>(
+      `WITH groups AS (
+         SELECT target_type,target_id,count(*)::int AS open_count,max(created_at) AS last_at,
+           (array_agg(note ORDER BY created_at DESC) FILTER (WHERE note IS NOT NULL))[1:3] AS notes
+         FROM reports WHERE resolved_at IS NULL GROUP BY target_type,target_id
+       ), ranked AS (
+         SELECT g.*,coalesce(t.hidden AND a.action = 'report.auto_hide',false) AS auto_hidden
+         FROM groups g LEFT JOIN moderation_targets t ON t.target_type = g.target_type AND t.id = g.target_id ${latestJoin}
+       ) SELECT g.*,g.last_at::text AS cursor_at,
+          (SELECT json_agg(json_build_object('reason',reason,'count',n) ORDER BY n DESC,reason) FROM
+            (SELECT reason,count(*)::int AS n FROM reports WHERE target_type=g.target_type AND target_id=g.target_id AND resolved_at IS NULL GROUP BY reason) reasons) AS reasons
+         FROM ranked g
+         WHERE ($1::timestamptz IS NULL OR (g.auto_hidden,g.open_count,g.last_at,g.target_type,g.target_id) < ($2::boolean,$3::int,$1::timestamptz,$4::text,$5::uuid))
+         ORDER BY g.auto_hidden DESC,g.open_count DESC,g.last_at DESC,g.target_type DESC,g.target_id DESC LIMIT 51`,
+      [c?.at ?? null, c?.urgent ?? false, c?.count ?? 0, c?.type ?? 'listing', c?.id ?? null]);
+    const page = rows.slice(0, PAGE_SIZE);
+    const previews = await queuePreviews(db, page);
+    const last = page.at(-1);
+    const body: ReportQueue = {
+      groups: page.map((g) => ({
+        targetType: g.target_type, targetId: g.target_id, openCount: g.open_count,
+        reasons: g.reasons ?? [], notes: g.notes ?? [], lastReportedAt: g.last_at.toISOString(),
+        preview: previews.get(`${g.target_type}:${g.target_id}`)?.preview ?? missingPreview, autoHidden: g.auto_hidden,
+      })),
+      next: rows.length > PAGE_SIZE && last ? cursor({ at: last.cursor_at, id: last.target_id, type: last.target_type, urgent: last.auto_hidden, count: last.open_count }) : null,
+    };
     res.json(body);
   });
 
@@ -108,18 +146,20 @@ export function router(deps: Deps): Router {
     const result = await db.tx(async (q) => {
       let blobPath: string | null = null;
       let restored = false;
-      if (body.targetType === 'photo' && body.action === 'restore' && (await isHidden(q, 'photo', body.targetId))) {
+      if (body.targetType === 'listing' && body.action !== 'hide'
+        && await q.maybeOne('SELECT 1 FROM listings WHERE id = $1 AND merged_into_id IS NOT NULL', [body.targetId])) {
+        fail(409, 'This listing was merged and cannot be restored.', 'listing_merged');
+      }
+      if (body.targetType === 'photo' && body.action === 'restore' && await q.maybeOne('SELECT 1 FROM photos WHERE id=$1 AND deleted_at IS NOT NULL', [body.targetId])) {
         fail(409, 'This photo was deleted when it was hidden, so it cannot come back.', 'photo_deleted');
       }
       if (body.action === 'hide' || body.action === 'restore') {
-        const wasHidden = body.targetType === 'photo' && (await isHidden(q, 'photo', body.targetId));
         const changed = await setHidden(q, body.targetType, body.targetId, body.action === 'hide');
         if (!changed) fail(404, 'That item was not found.', 'not_found');
-        if (body.targetType === 'photo' && body.action === 'hide' && !wasHidden) blobPath = await photoBlobPath(q, body.targetId);
+        if (body.targetType === 'photo' && body.action === 'hide') blobPath = await photoBlobPath(q, body.targetId);
       }
-      // Dismiss means the reports were wrong, so an item they hid on their own comes back. A photo
-      // cannot (its bytes are gone), and neither can the work of a member who has since been banned.
-      if (body.action === 'dismiss' && body.targetType !== 'photo'
+      // Dismissing automatic reports restores the item unless its author was banned.
+      if (body.action === 'dismiss'
         && (await isHidden(q, body.targetType, body.targetId)) && (await lastHideWasAuto(q, body.targetType, body.targetId))) {
         const preview = await previewTarget(q, body.targetType, body.targetId);
         const banned = preview.authorId
@@ -134,36 +174,41 @@ export function router(deps: Deps): Router {
       });
       return { resolved, restored, blobPath };
     });
-    if (result.blobPath) await deleteMedia(deps.media, [result.blobPath]);
+    if (result.blobPath) await deleteMedia(deps.media, [result.blobPath], db);
     res.json({ ok: true, resolvedReports: result.resolved, restored: result.restored });
   });
 
-  r.get('/admin/hidden', async (_req, res) => {
-    const rows = await db.query<{ target_type: HiddenItem['targetType']; id: string; created_at: Date }>(
-      `SELECT * FROM (
-         SELECT 'listing' AS target_type, id, created_at FROM listings WHERE hidden
-         UNION ALL SELECT 'recommendation', id, created_at FROM recommendations WHERE hidden
-         UNION ALL SELECT 'topic', id, created_at FROM topics WHERE hidden
-         UNION ALL SELECT 'reply', id, created_at FROM replies WHERE hidden
-         UNION ALL SELECT 'photo', id, created_at FROM photos WHERE deleted_at IS NOT NULL
-         UNION ALL SELECT 'user', id, created_at FROM users WHERE profile_hidden AND deleted_at IS NULL
-       ) x ORDER BY created_at DESC LIMIT 200`,
-    );
-    const items: HiddenItem[] = [];
-    for (const x of rows) {
-      items.push({
-        targetType: x.target_type,
-        targetId: x.id,
-        createdAt: x.created_at.toISOString(),
-        preview: await previewTarget(db, x.target_type, x.id),
-        autoHidden: await lastHideWasAuto(db, x.target_type, x.id),
-        restorable: x.target_type !== 'photo',
-      });
+  r.get('/admin/hidden', async (req, res) => {
+    const c = readCursor(req.query.cursor);
+    if (req.query.section === 'banned') {
+      const rows = await db.query<{ id: string; pseudonym: string; banned_at: Date; cursor_at: string }>(
+        `SELECT id,pseudonym,banned_at,banned_at::text AS cursor_at FROM users WHERE banned_at IS NOT NULL
+         AND ($1::timestamptz IS NULL OR (banned_at,id) < ($1::timestamptz,$2::uuid)) ORDER BY banned_at DESC,id DESC LIMIT 51`, [c?.at ?? null, c?.id ?? null]);
+      const page = rows.slice(0, PAGE_SIZE), last = page.at(-1);
+      res.json({
+        items: [], banned: page.map((u) => ({ id: u.id, pseudonym: u.pseudonym, bannedAt: u.banned_at.toISOString() })),
+        next: rows.length > PAGE_SIZE && last ? cursor({ at: last.cursor_at, id: last.id }) : null,
+      } satisfies HiddenList);
+      return;
     }
-    const banned = await db.query<{ id: string; pseudonym: string; banned_at: Date }>(
-      'SELECT id, pseudonym, banned_at FROM users WHERE banned_at IS NOT NULL ORDER BY banned_at DESC LIMIT 200',
-    );
-    const body: HiddenList = { items, banned: banned.map((u) => ({ id: u.id, pseudonym: u.pseudonym, bannedAt: u.banned_at.toISOString() })) };
+    const photos = req.query.section === 'photos';
+    const rows = await db.query<{ target_type: ReportTarget; target_id: string; created_at: Date; cursor_at: string; pending: boolean | null; attempts: number | null; error: string | null; deleted: boolean }>(
+      `SELECT t.target_type,t.id AS target_id,t.created_at,t.created_at::text AS cursor_at,
+         d.photo_id IS NOT NULL AND d.completed_at IS NULL AS pending,d.attempts,d.last_error AS error,
+         p.deleted_at IS NOT NULL AS deleted
+       FROM moderation_targets t LEFT JOIN media_deletions d ON t.target_type='photo' AND d.photo_id=t.id
+       LEFT JOIN photos p ON t.target_type='photo' AND p.id=t.id
+       WHERE t.hidden AND NOT t.merged AND ${photos ? "t.target_type='photo'" : "t.target_type<>'photo'"}
+         AND ($1::timestamptz IS NULL OR (t.created_at,t.target_type,t.id) < ($1::timestamptz,$2::text,$3::uuid))
+       ORDER BY t.created_at DESC,t.target_type DESC,t.id DESC LIMIT 51`, [c?.at ?? null, c?.type ?? 'listing', c?.id ?? null]);
+    const page = rows.slice(0, PAGE_SIZE), last = page.at(-1);
+    const previews = await queuePreviews(db, page);
+    const items: HiddenItem[] = page.map((x) => ({
+      targetType: x.target_type, targetId: x.target_id, createdAt: x.created_at.toISOString(),
+      ...(previews.get(`${x.target_type}:${x.target_id}`) ?? { preview: missingPreview, autoHidden: false }), restorable: x.target_type !== 'photo' || !x.deleted,
+      ...(photos ? { deletion: { pending: x.pending ?? true, attempts: x.attempts ?? 0, error: x.error } } : {}),
+    }));
+    const body: HiddenList = { items, banned: [], next: rows.length > PAGE_SIZE && last ? cursor({ at: last.cursor_at, id: last.target_id, type: last.target_type }) : null };
     res.json(body);
   });
 
@@ -189,7 +234,7 @@ export function router(deps: Deps): Router {
          RETURNING id`,
         [id],
       );
-      const photos = await q.query<{ blob_path: string }>(`UPDATE photos SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL RETURNING blob_path`, [id]);
+      const photos = await q.query<{ blob_path: string }>(`UPDATE photos SET deleted_at = coalesce(deleted_at, now()) WHERE user_id = $1 RETURNING blob_path`, [id]);
       // Their votes stop counting: opinions and upvotes go. Unban does not bring them back.
       const opinions = await q.query('DELETE FROM opinions WHERE user_id = $1 RETURNING listing_id', [id]);
       const upvotes = await q.query('DELETE FROM upvotes WHERE user_id = $1 RETURNING target_id', [id]);
@@ -200,7 +245,7 @@ export function router(deps: Deps): Router {
       await audit(q, { actorId: me.id, action: 'user.ban', targetType: 'user', targetId: id, detail: { hidden, removed: { opinions: opinions.length, upvotes: upvotes.length } } });
       return { hidden, blobPaths: photos.map((p) => p.blob_path) };
     });
-    await deleteMedia(deps.media, out.blobPaths);
+    await deleteMedia(deps.media, out.blobPaths, db);
     res.json({ ok: true, hidden: out.hidden });
   });
 
@@ -219,14 +264,19 @@ export function router(deps: Deps): Router {
 
   r.get('/admin/claims', async (req, res) => {
     const all = req.query.status === 'all';
-    const rows = await db.query<{ id: string; code: string; status: AdminClaim['status']; created_at: Date; decided_at: Date | null; user_id: string; pseudonym: string; listing_id: string; name: string; slug: string; kind: AdminClaim['listing']['kind']; owner_user_id: string | null }>(
-      `SELECT c.id, c.code, c.status, c.created_at, c.decided_at, u.id AS user_id, u.pseudonym, l.id AS listing_id, l.name, l.slug, l.kind, l.owner_user_id
+    const c = readCursor(req.query.cursor);
+    const rows = await db.query<{ id: string; code: string; status: AdminClaim['status']; created_at: Date; decided_at: Date | null; user_id: string; pseudonym: string; listing_id: string; name: string; slug: string; kind: AdminClaim['listing']['kind']; owner_user_id: string | null; cursor_at: string }>(
+      `SELECT c.created_at::text AS cursor_at, c.id, c.code, c.status, c.created_at, c.decided_at, u.id AS user_id, u.pseudonym, l.id AS listing_id, l.name, l.slug, l.kind, l.owner_user_id
        FROM claims c JOIN users u ON u.id = c.user_id JOIN listings l ON l.id = c.listing_id
-       ${all ? '' : "WHERE c.status = 'pending'"}
-       ORDER BY (c.status = 'pending') DESC, c.created_at DESC LIMIT 200`,
+       WHERE ${all ? 'true' : "c.status = 'pending'"}
+       AND ($1::timestamptz IS NULL OR ((c.status='pending'),c.created_at,c.id) < ($2::boolean,$1::timestamptz,$3::uuid))
+       ORDER BY (c.status = 'pending') DESC, c.created_at DESC,c.id DESC LIMIT 51`,
+      [c?.at ?? null, c?.urgent ?? true, c?.id ?? null],
     );
+    const page = rows.slice(0, PAGE_SIZE), last = page.at(-1);
     const body: ClaimQueue = {
-      claims: rows.map((x) => ({
+      next: rows.length > PAGE_SIZE && last ? cursor({ at: last.cursor_at, id: last.id, urgent: last.status === 'pending' }) : null,
+      claims: page.map((x) => ({
         id: x.id,
         code: x.code,
         status: x.status,
@@ -308,7 +358,7 @@ export function router(deps: Deps): Router {
       `SELECT l.id, l.kind, l.name, l.slug, l.area, l.hidden, l.owner_user_id, l.created_at,
               (SELECT count(*) FROM recommendations r WHERE r.listing_id = l.id) AS recs,
               (SELECT count(*) FROM opinions o WHERE o.listing_id = l.id) AS opinions
-       FROM listings l WHERE ($1 = '' OR l.name ILIKE $2 OR l.slug ILIKE $2)
+       FROM listings l WHERE l.merged_into_id IS NULL AND ($1 = '' OR l.name ILIKE $2 OR l.slug ILIKE $2)
        ORDER BY l.created_at DESC LIMIT 50`,
       [q, like],
     );
@@ -326,11 +376,13 @@ export function router(deps: Deps): Router {
     const { survivorId, loserId } = parse(mergeBody, req.body);
     if (survivorId === loserId) fail(400, 'Pick two different listings.', 'invalid_input');
     const moved = await db.tx(async (q) => {
-      const both = await q.query<{ id: string; kind: string; owner_user_id: string | null; contact: unknown; hidden: boolean }>(
-        'SELECT id, kind, owner_user_id, contact, hidden FROM listings WHERE id = ANY($1::uuid[]) FOR UPDATE', [[survivorId, loserId]]);
+      const both = await q.query<{ id: string; kind: string; owner_user_id: string | null; contact: Record<string, unknown> | null; hidden: boolean; merged_into_id: string | null }>(
+        'SELECT id, kind, owner_user_id, contact, hidden, merged_into_id FROM listings WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[survivorId, loserId]]);
       const survivor = both.find((x) => x.id === survivorId);
       const loser = both.find((x) => x.id === loserId);
       if (!survivor || !loser) fail(404, 'That listing was not found.', 'not_found');
+      if (survivor.merged_into_id || loser.merged_into_id) fail(409, 'Pick listings that have not been merged.', 'listing_merged');
+      if (survivor.hidden) fail(409, 'Restore the kept listing before merging.', 'listing_hidden');
       if (survivor.kind !== loser.kind) fail(400, 'Only listings of the same kind can be merged.', 'invalid_input');
 
       const recs = await q.query('UPDATE recommendations SET listing_id = $1 WHERE listing_id = $2 RETURNING id', [survivorId, loserId]);
@@ -355,13 +407,26 @@ export function router(deps: Deps): Router {
          WHERE $2::uuid = ANY(listing_ids) RETURNING id`,
         [survivorId, loserId],
       );
-      // An owner of the duplicate carries over when the survivor has none.
+      const ownerId = survivor.owner_user_id ?? loser.owner_user_id;
       if (loser.owner_user_id && !survivor.owner_user_id) {
-        await q.query('UPDATE listings SET owner_user_id = $2, contact = coalesce(contact, $3) WHERE id = $1', [survivorId, loser.owner_user_id, loser.contact as Record<string, unknown> | null]);
-        await q.query(`UPDATE claims SET listing_id = $1 WHERE listing_id = $2 AND status = 'approved'`, [survivorId, loserId]);
+        await q.query('UPDATE listings SET owner_user_id = $2, contact = $3 WHERE id = $1', [survivorId, loser.owner_user_id, loser.contact]);
       }
-      await q.query('UPDATE listings SET hidden = true, owner_user_id = NULL, contact = NULL WHERE id = $1', [loserId]);
-      await q.query(`UPDATE claims SET status = 'rejected', decided_by = $2, decided_at = now() WHERE listing_id = $1 AND status = 'pending'`, [loserId, me.id]);
+      await q.query(
+        `UPDATE claims SET status = 'revoked', decided_by = $3, decided_at = now()
+         WHERE listing_id = ANY($1::uuid[]) AND status = 'approved' AND user_id IS DISTINCT FROM $2::uuid`,
+        [[survivorId, loserId], ownerId, me.id]);
+      // Keep pending claims only when the combined listing still needs an owner.
+      await q.query(
+        `UPDATE claims c SET status = 'rejected', decided_by = $3, decided_at = now()
+         WHERE c.listing_id IN ($1::uuid, $2::uuid) AND c.status = 'pending' AND
+           ($4::uuid IS NOT NULL OR (c.listing_id = $2 AND EXISTS (
+             SELECT 1 FROM claims x WHERE x.listing_id = $1 AND x.user_id = c.user_id AND x.status = 'pending')))`,
+        [survivorId, loserId, me.id, ownerId]);
+      await q.query('UPDATE claims SET listing_id = $1 WHERE listing_id = $2', [survivorId, loserId]);
+      await q.query('UPDATE listings SET hidden = true, merged_into_id = $2, owner_user_id = NULL, contact = NULL WHERE id = $1', [loserId, survivorId]);
+      for (const id of new Set([survivor.owner_user_id, loser.owner_user_id].filter((id) => id !== null))) {
+        await refreshHasService(q, id);
+      }
       await resolveReports(q, 'listing', loserId);
       const counts = { recommendations: recs.length, opinions: opinions.length, bookmarks: bookmarks.length, replies: replies.length, topics: topics.length };
       await audit(q, { actorId: me.id, action: 'listing.merge', targetType: 'listing', targetId: survivorId, detail: { loserId, moved: counts } });

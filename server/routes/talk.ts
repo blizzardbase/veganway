@@ -34,7 +34,6 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PAGE_DEFAULT = 20;
 const PAGE_MAX = 50;
-const REPLIES_MAX = 1000;
 const EXCERPT_MAX = 160;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -103,6 +102,8 @@ const replyBody = z.object({
 const repliesQuery = z.object({
   target_type: z.enum(['listing', 'topic'], { error: 'That item was not found.' }),
   target_id: id,
+  cursor: id.optional(),
+  limit: z.coerce.number().int().min(1).max(PAGE_MAX).default(PAGE_DEFAULT),
 });
 
 const listQuery = z.object({
@@ -537,19 +538,48 @@ export function router(deps: Deps): Router {
     const targetId = q.target_id.toLowerCase();
     const { user, isAdmin } = viewer(res);
     await assertTarget(db, q.target_type, targetId, isAdmin);
+    if (q.cursor) {
+      const anchor = await db.maybeOne(
+        `SELECT id FROM replies WHERE id = $1 AND target_type = $2 AND target_id = $3 AND parent_id IS NULL ${isAdmin ? '' : 'AND NOT hidden'}`,
+        [q.cursor, q.target_type, targetId],
+      );
+      if (!anchor) fail(400, 'That page link is not valid. Please refresh.', 'bad_cursor');
+    }
+    const visible = `WITH visible AS (
+      SELECT * FROM replies WHERE target_type = $2 AND target_id = $3 ${isAdmin ? '' : 'AND NOT hidden'}
+    )`;
     const rows = await db.query<ReplyRow>(
-      `SELECT ${REPLY_COLUMNS} FROM replies r JOIN users u ON u.id = r.user_id
-       WHERE r.target_type = $2 AND r.target_id = $3 ${isAdmin ? '' : 'AND NOT r.hidden'}
-       ORDER BY r.created_at, r.id LIMIT ${REPLIES_MAX}`,
-      [user?.id ?? null, q.target_type, targetId],
+      `${visible}
+       SELECT ${REPLY_COLUMNS} FROM visible r JOIN users u ON u.id = r.user_id
+       WHERE r.parent_id IS NULL AND (r.deleted_at IS NULL OR EXISTS (
+         SELECT 1 FROM visible c WHERE c.parent_id = r.id AND c.deleted_at IS NULL
+       )) AND ($4::uuid IS NULL OR (r.created_at, r.id) > (
+         SELECT created_at, id FROM replies WHERE id = $4
+       ))
+       ORDER BY r.created_at, r.id LIMIT $5`,
+      [user?.id ?? null, q.target_type, targetId, q.cursor ?? null, q.limit + 1],
     );
+    const hasMore = rows.length > q.limit;
+    const page = rows.slice(0, q.limit);
+    const children = page.length ? await db.query<ReplyRow>(
+      `SELECT ${REPLY_COLUMNS} FROM replies r JOIN users u ON u.id = r.user_id
+       WHERE r.target_type = $2 AND r.target_id = $3 AND r.parent_id = ANY($4::uuid[])
+       AND r.deleted_at IS NULL ${isAdmin ? '' : 'AND NOT r.hidden'} ORDER BY r.created_at, r.id`,
+      [user?.id ?? null, q.target_type, targetId, page.map((r) => r.id)],
+    ) : [];
     const threads = new Map<string, ReplyThread>();
-    for (const row of rows) if (!row.parent_id) threads.set(row.id, { ...toReply(row, isAdmin), replies: [] });
+    for (const row of page) threads.set(row.id, { ...toReply(row, isAdmin), replies: [] });
     // A child whose parent is hidden stays hidden with it.
-    for (const row of rows) if (row.parent_id) threads.get(row.parent_id)?.replies.push(toReply(row, isAdmin));
+    for (const row of children) if (row.parent_id) threads.get(row.parent_id)?.replies.push(toReply(row, isAdmin));
     const items = [...threads.values()];
-    const total = items.reduce((n, t) => n + (t.deleted ? 0 : 1) + t.replies.filter((c) => !c.deleted).length, 0);
-    const response: RepliesResponse = { items, total };
+    const { total } = await db.one<{ total: number }>(
+      `WITH visible AS (
+         SELECT * FROM replies WHERE target_type = $1 AND target_id = $2 ${isAdmin ? '' : 'AND NOT hidden'}
+       ) SELECT count(*) AS total FROM visible r LEFT JOIN visible p ON p.id = r.parent_id
+       WHERE r.deleted_at IS NULL AND (r.parent_id IS NULL OR p.parent_id IS NULL AND p.id IS NOT NULL)`,
+      [q.target_type, targetId],
+    );
+    const response: RepliesResponse = { items, total, nextCursor: hasMore ? page[page.length - 1].id : null };
     res.json(response);
   });
 

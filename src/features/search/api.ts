@@ -1,15 +1,42 @@
 // Search results, and recent searches kept only in this browser.
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import type { SearchResults, SearchType } from '../../../shared/types/search';
+import type { SearchGroup, SearchResults, SearchType } from '../../../shared/types/search';
+
+function mergeGroup<T extends { id: string }>(groups: SearchGroup<T>[]): SearchGroup<T> {
+  const seen = new Set<string>();
+  return {
+    total: groups[0]?.total ?? 0,
+    items: groups.flatMap((g) => g.items).filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }),
+  };
+}
 
 export function useSearch(q: string, type: SearchType | null) {
   const trimmed = q.trim();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['search', trimmed, type],
-    queryFn: () => api.get<SearchResults>(`/api/search?q=${encodeURIComponent(trimmed)}${type ? `&type=${type}` : ''}`),
-    enabled: trimmed.length > 0,
+    queryFn: ({ pageParam }) => api.get<SearchResults>(`/api/search?q=${encodeURIComponent(trimmed)}${type ? `&type=${type}&offset=${pageParam}` : ''}`),
+    initialPageParam: 0,
     placeholderData: keepPreviousData,
+    getNextPageParam: (last, _pages, offset) => {
+      if (!type || offset >= 1000) return undefined;
+      const group = last[type];
+      const next = offset + group.items.length;
+      return group.items.length > 0 && next < group.total ? Math.min(next, 1000) : undefined;
+    },
+    select: ({ pages }): SearchResults => ({
+      q: pages[0].q,
+      places: mergeGroup(pages.map((p) => p.places)),
+      products: mergeGroup(pages.map((p) => p.products)),
+      services: mergeGroup(pages.map((p) => p.services)),
+      discussions: mergeGroup(pages.map((p) => p.discussions)),
+    }),
+    enabled: trimmed.length > 0,
+    retry: false,
     staleTime: 30_000,
   });
 }

@@ -95,3 +95,39 @@ describe('search', () => {
     assert.ok(long.body.q.length <= 100);
   });
 });
+
+test('review 11: search offsets stop at 1000 and an empty discussion page needs one search query', async () => {
+  const sql: string[] = [];
+  const app = await makeTestApp({ sqlLog: sql });
+  try {
+    const member = await signUp(app.agent());
+    await app.db.query(`INSERT INTO topics (user_id,kind,title) SELECT $1,'discussion','Synthetic offset '||n FROM generate_series(1,1005) n`, [member.user.id]);
+    for (const offset of [1000, 1001, 999999999]) {
+      const page = await app.agent().get<SearchResults>(`/api/search?q=offset&type=discussions&offset=${offset}`);
+      assert.equal(page.status, 200);
+      assert.equal(page.body.discussions.items.length, 5, `offset ${offset} is capped`);
+      assert.equal(page.body.discussions.total, 1005);
+    }
+    sql.length = 0;
+    const empty = await app.agent().get<SearchResults>('/api/search?q=unmatched&type=discussions&offset=100');
+    assert.equal(empty.status, 200);
+    assert.deepEqual(empty.body.discussions, { total: 0, items: [] });
+    assert.equal(sql.filter(statement => statement.includes('websearch_to_tsquery')).length, 1, 'an empty page runs one search query');
+    const pastEnd = await app.agent().get<SearchResults>('/api/search?q=offset&type=discussions&offset=999');
+    assert.equal(pastEnd.body.discussions.total, 1005);
+  } finally { await app.close(); }
+});
+
+test('review 11: empty discussion pages retain totals without repeating the search', async () => {
+  const sql: string[] = [];
+  const app = await makeTestApp({ sqlLog: sql });
+  try {
+    const member = await signUp(app.agent());
+    await app.db.query(`INSERT INTO topics (user_id,kind,title) VALUES ($1,'discussion','Synthetic empty page fixture')`, [member.user.id]);
+    sql.length = 0;
+    const page = await app.agent().get<SearchResults>('/api/search?q=fixture&type=discussions&offset=100');
+    assert.equal(page.status, 200);
+    assert.deepEqual(page.body.discussions, { total: 1, items: [] });
+    assert.equal(sql.filter(statement => statement.includes('websearch_to_tsquery')).length, 1);
+  } finally { await app.close(); }
+});

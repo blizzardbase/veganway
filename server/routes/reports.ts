@@ -4,7 +4,7 @@
 // Three open reports from distinct members whose accounts are older than 72 hours hide the target
 // until an admin decides, except a recommendation or reply on a listing that one of the reporters
 // owns: an owner cannot bury reviews with burner accounts, so those wait for an admin.
-// Hiding a photo deletes its bytes. The admin queue and actions live in routes/admin.ts.
+// Only an admin hide deletes photo bytes. The admin queue and actions live in routes/admin.ts.
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Deps } from '../deps.js';
@@ -12,7 +12,6 @@ import type { Queryable } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { currentUser, requireAdmin, requireUser } from '../lib/auth.js';
 import { fail, parse } from '../lib/http.js';
-import { deleteMedia } from '../lib/media.js';
 import { limit, type Rule } from '../lib/rate.js';
 import {
   AUTO_HIDE_REPORTS, REPORT_ACCOUNT_AGE_HOURS, REPORT_NOTE_MAX, REPORT_REASONS, REPORT_TARGETS,
@@ -56,7 +55,7 @@ export async function targetExists(db: Queryable, type: ReportTarget, id: string
 export async function setHidden(db: Queryable, type: ReportTarget, id: string, hidden: boolean): Promise<boolean> {
   if (type === 'photo') {
     const rows = await db.query(
-      `UPDATE photos SET deleted_at = CASE WHEN $2 THEN coalesce(deleted_at, now()) ELSE NULL END WHERE id = $1 RETURNING id`,
+      `UPDATE photos SET hidden = $2, deleted_at = CASE WHEN $2 THEN coalesce(deleted_at, now()) ELSE deleted_at END WHERE id = $1 AND ($2 OR deleted_at IS NULL) RETURNING id`,
       [id, hidden],
     );
     return rows.length > 0;
@@ -96,6 +95,15 @@ async function listingOwnerOf(db: Queryable, type: ReportTarget, id: string): Pr
       'SELECT l.owner_user_id FROM recommendations r JOIN listings l ON l.id = r.listing_id WHERE r.id = $1', [id]);
     return row?.owner_user_id ?? null;
   }
+  if (type === 'photo') {
+    // A shared photo can sit on several reviews; any reporting listing owner exempts it.
+    const row = await db.maybeOne<{ owner_user_id: string }>(
+      `SELECT l.owner_user_id FROM recommendations r JOIN listings l ON l.id = r.listing_id
+       JOIN reports p ON p.target_type = 'photo' AND p.target_id = r.photo_id
+         AND p.user_id = l.owner_user_id AND p.resolved_at IS NULL
+       WHERE r.photo_id = $1 LIMIT 1`, [id]);
+    return row?.owner_user_id ?? null;
+  }
   if (type === 'reply') {
     const row = await db.maybeOne<{ owner_user_id: string | null }>(
       `SELECT l.owner_user_id FROM replies x JOIN listings l ON x.target_type = 'listing' AND l.id = x.target_id WHERE x.id = $1`, [id]);
@@ -105,7 +113,7 @@ async function listingOwnerOf(db: Queryable, type: ReportTarget, id: string): Pr
 }
 
 export async function isHidden(db: Queryable, type: ReportTarget, id: string): Promise<boolean> {
-  if (type === 'photo') return Boolean(await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND deleted_at IS NOT NULL', [id]));
+  if (type === 'photo') return Boolean(await db.maybeOne('SELECT 1 FROM photos WHERE id = $1 AND (hidden OR deleted_at IS NOT NULL)', [id]));
   if (type === 'user') return Boolean(await db.maybeOne('SELECT 1 FROM users WHERE id = $1 AND profile_hidden', [id]));
   return Boolean(await db.maybeOne(`SELECT 1 FROM ${TABLE[type]} WHERE id = $1 AND hidden`, [id]));
 }
@@ -161,9 +169,9 @@ export async function previewTarget(db: Queryable, type: ReportTarget, id: strin
       return { title: on ? `Reply on ${on}` : 'Reply', excerpt: excerpt(r.body), path, hidden: r.hidden, author: r.author, authorId: r.author_id, exists: true };
     }
     case 'photo': {
-      const r = await db.maybeOne<{ blob_path: string; deleted_at: Date | null; author: string; author_id: string }>(
-        `SELECT p.blob_path, p.deleted_at, u.pseudonym AS author, u.id AS author_id FROM photos p JOIN users u ON u.id = p.user_id WHERE p.id = $1`, [id]);
-      return r ? { title: 'Photo', excerpt: null, path: `/media/${r.blob_path}`, hidden: r.deleted_at !== null, author: r.author, authorId: r.author_id, exists: true } : missing;
+      const r = await db.maybeOne<{ blob_path: string; hidden: boolean; deleted_at: Date | null; author: string; author_id: string }>(
+        `SELECT p.blob_path, p.hidden, p.deleted_at, u.pseudonym AS author, u.id AS author_id FROM photos p JOIN users u ON u.id = p.user_id WHERE p.id = $1`, [id]);
+      return r ? { title: 'Photo', excerpt: null, path: r.hidden || r.deleted_at ? null : `/media/${r.blob_path}`, hidden: r.hidden || r.deleted_at !== null, author: r.author, authorId: r.author_id, exists: true } : missing;
     }
     case 'user': {
       const r = await db.maybeOne<{ pseudonym: string; display_name: string | null; bio: string | null; profile_hidden: boolean; banned_at: Date | null }>(
@@ -178,6 +186,21 @@ export async function previewTarget(db: Queryable, type: ReportTarget, id: strin
 export function router(deps: Deps): Router {
   const r = Router();
   const { db } = deps;
+
+  // Existing listing and recommendation projections expose a URL. Resolve only a currently
+  // displayed photo, without changing those projections or revealing unattached uploads.
+  r.get('/photo-target', requireUser, async (req, res) => {
+    const { url } = parse(z.object({ url: z.string().max(500).regex(/^\/media\/photos\/[a-zA-Z0-9._-]+$/) }), req.query);
+    const photo = await db.maybeOne<{ id: string }>(
+      `SELECT p.id FROM photos p WHERE p.blob_path = $1 AND p.deleted_at IS NULL AND NOT p.hidden AND (
+        EXISTS (SELECT 1 FROM listings l WHERE l.photo_id = p.id AND NOT l.hidden)
+        OR EXISTS (SELECT 1 FROM recommendations r JOIN listings l ON l.id = r.listing_id
+          WHERE r.photo_id = p.id AND NOT r.hidden AND NOT l.hidden)
+      )`, [url.slice('/media/'.length)],
+    );
+    if (!photo) fail(404, 'That photo was not found.', 'not_found');
+    res.json(photo);
+  });
 
   r.post('/', requireUser, async (req, res) => {
     const me = currentUser(res);
@@ -207,7 +230,6 @@ export function router(deps: Deps): Router {
         [body.targetType, body.targetId, REPORT_ACCOUNT_AGE_HOURS],
       );
       let hidden = false;
-      let blobPath: string | null = null;
       if (n >= AUTO_HIDE_REPORTS && !(await isHidden(q, body.targetType, body.targetId))) {
         const owner = await listingOwnerOf(q, body.targetType, body.targetId);
         const ownerReported = owner !== null && Boolean(await q.maybeOne(
@@ -215,16 +237,16 @@ export function router(deps: Deps): Router {
           [body.targetType, body.targetId, owner],
         ));
         if (!ownerReported) {
-          hidden = await setHidden(q, body.targetType, body.targetId, true);
+          hidden = body.targetType === 'photo'
+            ? (await q.query('UPDATE photos SET hidden = true WHERE id = $1 RETURNING id', [body.targetId])).length > 0
+            : await setHidden(q, body.targetType, body.targetId, true);
           if (hidden) {
-            if (body.targetType === 'photo') blobPath = await photoBlobPath(q, body.targetId);
             await audit(q, { actorId: null, action: 'report.auto_hide', targetType: body.targetType, targetId: body.targetId, detail: { reporters: n } });
           }
         }
       }
-      return { hidden, blobPath };
+      return { hidden };
     });
-    if (out.blobPath) await deleteMedia(deps.media, [out.blobPath]);
     const response: ReportCreated = { ok: true, hidden: out.hidden };
     res.status(201).json(response);
   });

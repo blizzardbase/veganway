@@ -273,6 +273,38 @@ describe('talk: replies and upvotes', () => {
   });
   after(async () => { await app.close(); });
 
+  test('a reply created after 1000 others is reachable through cursor pages with the true total', async () => {
+    const topic = await createDiscussion(alice);
+    await app.db.query(
+      `INSERT INTO replies (target_type, target_id, user_id, body, created_at)
+       SELECT 'topic', $1, $2, 'Earlier reply ' || g, now() - interval '2 days' + g * interval '1 second'
+       FROM generate_series(1, 1000) g`,
+      [topic.id, alice.user.id],
+    );
+    const newest = await bob.agent.post<ReplyResponse>('/api/talk/replies', {
+      targetType: 'topic', targetId: topic.id, body: 'The newest reply is still reachable.',
+    });
+    assert.equal(newest.status, 201);
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page: { status: number; body: RepliesResponse } = await app.agent().get(
+        `/api/talk/replies?target_type=topic&target_id=${topic.id}&limit=50${cursor ? `&cursor=${cursor}` : ''}`,
+      );
+      assert.equal(page.status, 200);
+      assert.equal(page.body.total, 1001, 'the total describes the whole conversation');
+      assert.ok(page.body.items.length <= 50);
+      for (const reply of page.body.items) {
+        assert.ok(!seen.has(reply.id), 'pages do not repeat replies');
+        seen.add(reply.id);
+      }
+      cursor = page.body.nextCursor;
+      assert.ok(seen.size <= 1001, 'pagination terminates');
+    } while (cursor);
+    assert.equal(seen.size, 1001);
+    assert.ok(seen.has(newest.body.reply.id));
+  });
+
   test('a reply to a reply attaches to its top level parent', async () => {
     const topic = await createDiscussion(alice);
     const top = await bob.agent.post<ReplyResponse>('/api/talk/replies', { targetType: 'topic', targetId: topic.id, body: 'Try the place in JLT.' });
@@ -369,6 +401,87 @@ describe('talk: replies and upvotes', () => {
     assert.equal(stored.body, '', 'the text is gone from the database');
     const upvote = await alice.agent.post(`/api/talk/replies/${reply.body.reply.id}/upvote`);
     assert.equal(upvote.status, 404);
+  });
+});
+
+describe('talk: reply cursor pages', () => {
+  let app: TestApp;
+  let admin: SignedUp;
+  before(async () => {
+    app = await makeTestApp();
+    admin = await asAdmin(app);
+  });
+  after(async () => { await app.close(); });
+
+  for (const targetType of ['topic', 'listing'] as const) {
+    test(`${targetType} pages keep complete children and deleted parent placeholders without wasting pages on deleted rows`, async () => {
+      const targetId = targetType === 'topic' ? (await createDiscussion(admin)).id : await insertListing(app.db, admin.user.id);
+      const ids = [
+        '00000000-0000-4000-8000-000000000001',
+        '00000000-0000-4000-8000-000000000002',
+        '00000000-0000-4000-8000-000000000003',
+        '00000000-0000-4000-8000-000000000004',
+      ].map((id) => targetType === 'topic' ? id : id.replace('4000', '4001'));
+      await app.db.query(
+        `INSERT INTO replies (target_type, target_id, user_id, body, created_at, deleted_at)
+         SELECT $1, $2, $3, '', '2025-01-01'::timestamptz, now() FROM generate_series(1, 1001)`,
+        [targetType, targetId, admin.user.id],
+      );
+      for (const [index, id] of ids.entries()) {
+        await app.db.query(
+          `INSERT INTO replies (id, target_type, target_id, user_id, body, created_at, deleted_at, hidden)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, targetType, targetId, admin.user.id, index === 0 ? '' : `Top reply ${index}`,
+            index < 2 ? '2026-01-01T00:00:00.000001Z' : '2026-01-01T00:00:00.000002Z',
+            index === 0 ? new Date() : null, index === 3],
+        );
+      }
+      await app.db.query(
+        `INSERT INTO replies (target_type, target_id, parent_id, user_id, body)
+         SELECT $1, $2, $3, $4, 'Child reply ' || g FROM generate_series(1, 1001) g`,
+        [targetType, targetId, ids[0], admin.user.id],
+      );
+      await app.db.query(
+        `INSERT INTO replies (target_type, target_id, parent_id, user_id, body, hidden, deleted_at)
+         VALUES ($1, $2, $3, $5, 'Under hidden parent', false, null),
+                ($1, $2, $4, $5, 'Hidden child', true, null),
+                ($1, $2, $4, $5, '', false, now())`,
+        [targetType, targetId, ids[3], ids[0], admin.user.id],
+      );
+      const url = `/api/talk/replies?target_type=${targetType}&target_id=${targetId}&limit=1`;
+      const first = await app.agent().get<RepliesResponse>(url);
+      assert.equal(first.status, 200);
+      assert.equal(first.body.total, 1003);
+      assert.equal(first.body.items.length, 1, 'deleted leaves do not consume the page');
+      assert.equal(first.body.items[0].id, ids[0]);
+      assert.equal(first.body.items[0].deleted, true);
+      assert.equal(first.body.items[0].author, null);
+      assert.equal(first.body.items[0].body, '');
+      assert.equal(first.body.items[0].replies.length, 1001, 'a thread is never split across pages');
+      assert.equal(new Set(first.body.items[0].replies.map((r) => r.id)).size, 1001);
+      assert.equal(first.body.nextCursor, ids[0]);
+      const second = await app.agent().get<RepliesResponse>(`${url}&cursor=${first.body.nextCursor}`);
+      assert.deepEqual(second.body.items.map((r) => r.id), [ids[1]], 'equal timestamps use the reply id');
+      assert.equal(second.body.nextCursor, ids[1]);
+      await admin.agent.delete(`/api/talk/replies/${ids[1]}`);
+      const third = await app.agent().get<RepliesResponse>(`${url}&cursor=${second.body.nextCursor}`);
+      assert.deepEqual(third.body.items.map((r) => r.id), [ids[2]], 'a deleted cursor still anchors the next page');
+      assert.equal(third.body.total, 1002);
+      assert.equal(third.body.nextCursor, null);
+      const adminPage = await admin.agent.get<RepliesResponse>(url);
+      assert.equal(adminPage.body.total, 1005, 'admins also count hidden replies and children');
+      assert.equal(adminPage.body.items[0].replies.length, 1002);
+    });
+  }
+
+  test('reply pagination refuses invalid limits and cursors outside the conversation', async () => {
+    const topic = await createDiscussion(admin);
+    const other = await createDiscussion(admin);
+    const reply = await admin.agent.post<ReplyResponse>('/api/talk/replies', { targetType: 'topic', targetId: other.id, body: 'Another conversation.' });
+    const url = `/api/talk/replies?target_type=topic&target_id=${topic.id}`;
+    for (const query of ['limit=0', 'limit=51', 'cursor=broken', `cursor=${reply.body.reply.id}`, 'cursor=00000000-0000-4000-8000-000000000099']) {
+      assert.equal((await app.agent().get(`${url}&${query}`)).status, 400, query);
+    }
   });
 });
 
@@ -551,4 +664,23 @@ describe('talk: access, pins and hiding', () => {
     assert.equal((await app.agent().get('/api/talk/topics/00000000-0000-4000-8000-0000000000ff')).status, 404);
     assert.equal((await alice.agent.post('/api/talk/topics/xyz/upvote')).status, 404);
   });
+});
+
+test('review 10: hidden reply cursors are indistinguishable from missing cursors for members', async () => {
+  const app = await makeTestApp();
+  try {
+    const member = await signUp(app.agent());
+    const admin = await asAdmin(app);
+    const topic = await createDiscussion(member);
+    const reply = await app.db.one<{ id: string }>(`INSERT INTO replies (target_type,target_id,user_id,body,hidden)
+      VALUES ('topic',$1,$2,'Synthetic hidden cursor',true) RETURNING id`, [topic.id, member.user.id]);
+    const url = `/api/talk/replies?target_type=topic&target_id=${topic.id}&cursor=`;
+    const missing = await member.agent.get<ErrorBody>(url + '00000000-0000-4000-8000-000000000099');
+    const hidden = await member.agent.get<ErrorBody>(url + reply.id);
+    assert.equal(missing.status, 400);
+    assert.equal(hidden.status, missing.status);
+    assert.deepEqual(hidden.body, missing.body);
+    assert.equal((await app.agent().get(url + reply.id)).status, 400);
+    assert.equal((await admin.agent.get(url + reply.id)).status, 200);
+  } finally { await app.close(); }
 });

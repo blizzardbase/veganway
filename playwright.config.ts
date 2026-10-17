@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const PORT = 4391;
+// E2E_PORT lets parallel worktrees run the suite side by side.
+const PORT = Number(process.env.E2E_PORT || 4391);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 const phone = { browserName: 'chromium' as const, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };

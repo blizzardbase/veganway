@@ -11,6 +11,7 @@ import { useMyPosts, useMyService, useProfile, useUpdateProfile } from '../featu
 import { EditProfileSheet } from '../features/me/EditProfileSheet';
 import { DeleteAccountSheet, RecoverySheet } from '../features/me/AccountSheets';
 import { PostsList, listingPath } from '../features/me/Lists';
+import { RequestError } from '../features/me/RequestError';
 import { SavedList } from '../features/listings/SavedList';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -36,7 +37,8 @@ function NavRow({ to, icon, label, onClick }: { to?: string; icon: ReactNode; la
 }
 
 export function Me() {
-  const { data, isPending } = useMe();
+  const me = useMe();
+  const { data, isPending } = me;
   const user = data?.user;
   const signedIn = Boolean(user);
   const signOut = useSignOut();
@@ -55,6 +57,13 @@ export function Me() {
     updateProfile.mutate({ theme: t });
   };
 
+  const onSignOut = () => signOut.mutate(undefined, {
+    onSuccess: () => {
+      toast.show({ message: 'Signed out.' });
+      navigate('/', { replace: true });
+    },
+  });
+
   if (isPending) {
     return (
       <>
@@ -64,6 +73,14 @@ export function Me() {
     );
   }
   if (!user) {
+    if (me.isError) {
+      return (
+        <>
+          <TopBar title="Me" />
+          <RequestError message="Could not load your account." retry={() => void me.refetch()} busy={me.isFetching} />
+        </>
+      );
+    }
     return (
       <>
         <TopBar title="Me" />
@@ -84,6 +101,7 @@ export function Me() {
     <>
       <TopBar title="Me" />
       <div className="flex flex-col gap-7 pb-6">
+        {me.isError && <RequestError message="Could not load your account." retry={() => void me.refetch()} busy={me.isFetching} />}
         <div className="flex items-center gap-4">
           <Avatar name={user.displayName || user.pseudonym} src={shown?.avatarUrl} size="lg" />
           {/* The name always shows in full: it wraps, and Edit is a small icon button beside it. */}
@@ -97,23 +115,26 @@ export function Me() {
             <Pencil size={18} aria-hidden="true" />
           </IconButton>
         </div>
+        {profile.isError && <RequestError message="Could not load your profile." retry={() => void profile.refetch()} busy={profile.isFetching} />}
 
         <Section title="Saved">
           <SavedList />
         </Section>
 
         <Section title="My posts">
-          <PostsList posts={posts.data} loading={posts.isPending} />
+          {posts.isError && <RequestError message="Could not load your posts." retry={() => void posts.refetch()} busy={posts.isFetching} />}
+          <PostsList posts={posts.data} loading={posts.isPending} failed={posts.isError} />
         </Section>
 
         <Section title="My service">
+          {service.isError && <RequestError message="Could not load your service." retry={() => void service.refetch()} busy={service.isFetching} />}
           {service.isPending ? null : myService ? (
             <Card padded={false}>
               <NavRow to={listingPath(myService.kind, myService.slug)} icon={<ChefHat size={20} aria-hidden="true" />} label={myService.name} />
             </Card>
-          ) : (
+          ) : !service.isError ? (
             <InlineEmpty icon={ChefHat} line="Do you bake, cook or run a vegan service? Showcase it here." action={{ label: 'Add it', to: '/add/service' }} />
-          )}
+          ) : null}
           {pendingClaims.map((c) => (
             <p key={c.id} className="px-2 text-sm text-muted">
               Claim for <Link className="font-bold text-brand" to={listingPath(c.listing.kind, c.listing.slug)}>{c.listing.name}</Link> is waiting. Your code: <span className="font-mono font-bold text-ink">{c.code}</span>
@@ -144,15 +165,13 @@ export function Me() {
             block
             icon={<LogOut size={18} aria-hidden="true" />}
             busy={signOut.isPending}
-            onClick={() => signOut.mutate(undefined, {
-              onSettled: () => {
-                toast.show({ message: 'Signed out.' });
-                navigate('/', { replace: true });
-              },
-            })}
+            onClick={onSignOut}
           >
             Sign out
           </Button>
+          {signOut.isError && (
+            <RequestError message="Sign out did not finish. You are still signed in." retry={onSignOut} busy={signOut.isPending} />
+          )}
           <Button variant="danger" block icon={<Trash2 size={18} aria-hidden="true" />} onClick={() => setSheet('delete')}>Delete account</Button>
         </div>
       </div>

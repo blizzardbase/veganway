@@ -4,7 +4,7 @@ import { Flag } from 'lucide-react';
 import { Button, IconButton, Sheet, useToast } from '../../ui';
 import { ApiError, errorMessage } from '../../api/client';
 import { useRequireAccount } from '../auth/Gate';
-import { useReport, type ReportReason } from './api';
+import { useReport, type ReportDestination, type ReportReason } from './api';
 
 const REASONS: { value: ReportReason; label: string }[] = [
   { value: 'wrong_info', label: 'Wrong or out of date' },
@@ -15,7 +15,14 @@ const REASONS: { value: ReportReason; label: string }[] = [
 ];
 
 /** Report, as a flag icon in a detail page's top bar (the same place on every detail page) or as a text button. */
-export function ReportButton({ targetType, targetId, variant = 'icon' }: { targetType: 'listing' | 'recommendation'; targetId: string; variant?: 'icon' | 'text' }) {
+type ReportButtonProps = (
+  | { targetType: 'listing' | 'recommendation' | 'photo'; targetId: string }
+  | { targetType: 'photo'; photoUrl: string }
+) & { variant?: 'icon' | 'text' };
+
+export function ReportButton(props: ReportButtonProps) {
+  const { targetType, variant = 'icon' } = props;
+  const label = targetType === 'listing' ? 'Report' : `Report ${targetType}`;
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason | null>(null);
   const report = useReport();
@@ -24,7 +31,10 @@ export function ReportButton({ targetType, targetId, variant = 'icon' }: { targe
 
   const send = () => {
     if (!reason) return;
-    report.mutate({ target_type: targetType, target_id: targetId, reason }, {
+    const target: ReportDestination = 'photoUrl' in props
+      ? { target_type: 'photo', photo_url: props.photoUrl }
+      : { target_type: targetType, target_id: props.targetId };
+    report.mutate({ ...target, reason }, {
       onSuccess: () => {
         setOpen(false);
         setReason(null);
@@ -40,12 +50,12 @@ export function ReportButton({ targetType, targetId, variant = 'icon' }: { targe
   return (
     <>
       {variant === 'icon' ? (
-        <IconButton label="Report" onClick={() => requireAccount(() => setOpen(true))}>
+        <IconButton label={label} onClick={() => requireAccount(() => setOpen(true))}>
           <Flag size={20} aria-hidden="true" />
         </IconButton>
       ) : (
         <Button variant="ghost" size="md" icon={<Flag size={16} aria-hidden="true" />} onClick={() => requireAccount(() => setOpen(true))}>
-          Report
+          {label}
         </Button>
       )}
       <Sheet open={open} onClose={() => setOpen(false)} title="What is wrong?">

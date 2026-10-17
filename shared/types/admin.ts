@@ -64,17 +64,19 @@ export interface ReportGroup {
 
 export interface ReportQueue {
   groups: ReportGroup[];
+  next: string | null;
 }
 
-/** GET /api/admin/hidden: everything hidden now, and every banned member. */
+/** GET /api/admin/hidden: restorable items; section=photos selects permanent history, section=banned selects members. */
 export interface HiddenItem {
   targetType: ReportTarget;
   targetId: string;
   createdAt: string;
   preview: TargetPreview;
   autoHidden: boolean;
-  /** False for photos: their bytes are deleted when they are hidden, so they cannot come back. */
+  /** False for photos: hiding them permanently removes them, even while byte deletion is pending. */
   restorable: boolean;
+  deletion?: { pending: boolean; attempts: number; error: string | null };
 }
 
 export interface BannedMember {
@@ -86,6 +88,7 @@ export interface BannedMember {
 export interface HiddenList {
   items: HiddenItem[];
   banned: BannedMember[];
+  next: string | null;
 }
 
 /**
@@ -113,6 +116,7 @@ export interface AdminClaim {
 
 export interface ClaimQueue {
   claims: AdminClaim[];
+  next: string | null;
 }
 
 export interface AdminListing {
@@ -132,7 +136,7 @@ export interface AdminListings {
   listings: AdminListing[];
 }
 
-/** POST /api/admin/listings/merge. The loser is hidden; everything members wrote moves to the survivor. */
+/** POST /api/admin/listings/merge. The loser permanently resolves to the survivor; member content moves there. */
 export interface MergeBody {
   survivorId: string;
   loserId: string;

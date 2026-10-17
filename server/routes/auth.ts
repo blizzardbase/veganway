@@ -4,10 +4,10 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import type { Deps } from '../deps.js';
-import { isUniqueViolation } from '../db.js';
+import { isUniqueViolation, type Queryable } from '../db.js';
 import { audit } from '../lib/audit.js';
 import {
-  clearSessionCookie, createSession, currentUser, loadUser, requireUser, setSessionCookie, startSession, toMe, toSessionUser, USER_COLUMNS,
+  clearSessionCookie, createSession, currentUser, loadUser, requireUser, setSessionCookie, toMe, toSessionUser, USER_COLUMNS,
 } from '../lib/auth.js';
 import {
   emailHmac, formatRecoveryCode, ipKey, isRecoveryCodeShape, newRecoveryCode, normalizeRecoveryCode,
@@ -15,7 +15,7 @@ import {
 } from '../lib/crypto.js';
 import { fail, parse } from '../lib/http.js';
 import { availablePseudonym } from '../lib/pseudonym.js';
-import { check, hit, limit } from '../lib/rate.js';
+import { check, limit } from '../lib/rate.js';
 import { PASSWORD_MAX, PASSWORD_MIN, type AccountWithCodeResponse, type AuthResponse, type MeResponse, type RecoveryCodeResponse } from '../../shared/types.js';
 
 const email = z.string({ error: 'Enter your email address.' }).trim().min(3, { error: 'Enter your email address.' })
@@ -35,6 +35,17 @@ const changeBody = z.object({ currentPassword: anyPassword, newPassword });
 const passwordOnly = z.object({ password: anyPassword });
 
 const clientIp = (req: Request) => req.ip ?? req.socket.remoteAddress ?? 'unknown';
+
+interface Credentials { id: string; pw_hash: string; recovery_hash: string }
+
+// Hold the account lock until the session or credential write commits. Scrypt stays outside it.
+async function credentialsCurrent(q: Queryable, row: Credentials): Promise<boolean> {
+  return Boolean(await q.maybeOne(
+    `SELECT id FROM users WHERE id = $1 AND pw_hash = $2 AND recovery_hash = $3
+     AND banned_at IS NULL AND deleted_at IS NULL AND NOT is_system FOR UPDATE`,
+    [row.id, row.pw_hash, row.recovery_hash],
+  ));
+}
 
 export function router(deps: Deps): Router {
   const r = Router();
@@ -71,7 +82,8 @@ export function router(deps: Deps): Router {
             'INSERT INTO users (email_hmac, pw_hash, recovery_hash, pseudonym) VALUES ($1, $2, $3, $4) RETURNING id',
             [emailH, pwHash, recoveryHash(keys, code), pseudonym],
           );
-          await hit(q, 'signup:global', limits.signupGlobal);
+          // The atomic counter also enforces capacity here. A full cap rolls back the insert.
+          await limit(q, 'signup:global', limits.signupGlobal);
           const session = await createSession(q, row.id);
           const user = await q.one<Parameters<typeof toSessionUser>[0]>(`SELECT ${USER_COLUMNS} FROM users u WHERE u.id = $1`, [row.id]);
           return { user: toSessionUser(user), ...session };
@@ -94,17 +106,22 @@ export function router(deps: Deps): Router {
     // Both limits are counted before any scrypt work.
     await limit(db, `login:email:${emailH}`, limits.loginEmail);
     await limit(db, `login:ip:${ipKey(keys, clientIp(req))}`, limits.loginIp);
-    const row = await db.maybeOne<{ id: string; pw_hash: string; banned_at: Date | null }>(
-      'SELECT id, pw_hash, banned_at FROM users WHERE email_hmac = $1 AND deleted_at IS NULL AND NOT is_system',
+    const row = await db.maybeOne<Credentials & { banned_at: Date | null }>(
+      'SELECT id, pw_hash, recovery_hash, banned_at FROM users WHERE email_hmac = $1 AND deleted_at IS NULL AND NOT is_system',
       [emailH],
     );
     const ok = await passwords.verify(body.password, row?.pw_hash ?? (await dummy()));
     if (!row || !ok) fail(401, 'Email or password is wrong.', 'bad_credentials');
     if (row.banned_at) fail(403, 'This account is suspended.', 'banned');
-    const csrf = await startSession(deps, db, res, row.id);
-    const user = await loadUser(db, row.id);
-    if (!user) fail(401, 'Email or password is wrong.', 'bad_credentials');
-    const response: AuthResponse = { user: toMe(user), csrf };
+    const out = await db.tx(async (q) => {
+      if (!(await credentialsCurrent(q, row))) fail(401, 'Email or password is wrong.', 'bad_credentials');
+      const session = await createSession(q, row.id);
+      const user = await loadUser(q, row.id);
+      if (!user) fail(401, 'Email or password is wrong.', 'bad_credentials');
+      return { user, ...session };
+    });
+    setSessionCookie(deps, res, out.token);
+    const response: AuthResponse = { user: toMe(out.user), csrf: out.csrf };
     res.json(response);
   });
 
@@ -186,11 +203,12 @@ export function router(deps: Deps): Router {
     const me = currentUser(res);
     const body = parse(changeBody, req.body);
     await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<{ pw_hash: string }>('SELECT pw_hash FROM users WHERE id = $1', [me.id]);
+    const row = await db.one<Credentials>('SELECT id, pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
     if (!(await passwords.verify(body.currentPassword, row.pw_hash))) fail(401, 'Your current password is wrong.', 'bad_credentials', 'currentPassword');
     const pwHash = await passwords.hash(body.newPassword);
     const session = res.locals.session!;
     await db.tx(async (q) => {
+      if (!(await credentialsCurrent(q, row))) fail(401, 'Your current password is wrong.', 'bad_credentials', 'currentPassword');
       await q.query('UPDATE users SET pw_hash = $1 WHERE id = $2', [pwHash, me.id]);
       await q.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2', [me.id, session.tokenHash]);
       await audit(q, { actorId: me.id, action: 'auth.password_change', targetType: 'user', targetId: me.id });
@@ -204,11 +222,14 @@ export function router(deps: Deps): Router {
     const me = currentUser(res);
     const body = parse(passwordOnly, req.body);
     await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<{ pw_hash: string }>('SELECT pw_hash FROM users WHERE id = $1', [me.id]);
+    const row = await db.one<Credentials>('SELECT id, pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
     if (!(await passwords.verify(body.password, row.pw_hash))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
     const next = newRecoveryCode();
-    await db.query('UPDATE users SET recovery_hash = $1 WHERE id = $2', [recoveryHash(keys, next), me.id]);
-    await audit(db, { actorId: me.id, action: 'auth.recovery_code_reissued', targetType: 'user', targetId: me.id });
+    await db.tx(async (q) => {
+      if (!(await credentialsCurrent(q, row))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
+      await q.query('UPDATE users SET recovery_hash = $1 WHERE id = $2', [recoveryHash(keys, next), me.id]);
+      await audit(q, { actorId: me.id, action: 'auth.recovery_code_reissued', targetType: 'user', targetId: me.id });
+    });
     const response: RecoveryCodeResponse = { recoveryCode: formatRecoveryCode(next) };
     res.json(response);
   });

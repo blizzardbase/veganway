@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default ts.config(
-  { ignores: ['dist/**', 'node_modules/**', 'data/**', 'test-results/**', 'playwright-report/**', '.vercel/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'data/**', 'test-results/**', 'playwright-report/**', '.vercel/**', '.claude/**', 'output/**'] },
   js.configs.recommended,
   ...ts.configs.recommended,
   {
