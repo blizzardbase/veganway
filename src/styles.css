@@ -1,0 +1,239 @@
+@import "tailwindcss";
+
+/* Basil and Saffron. Spec section 7. Light values here; dark values below. */
+@theme {
+  --color-*: initial;
+  --color-bg: #fafaf7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f2f4ef;
+  /* The selected segment in a Segmented control: a clear step up from the surface-2 track. */
+  --color-segment: #ffffff;
+  --color-ink: #15201a;
+  --color-muted: #5b665f;
+  --color-line: #e3e7e0;
+  --color-brand: #0f6b4a;
+  --color-on-brand: #ffffff;
+  --color-brand-soft: #e4f2ea;
+  --color-saffron: #f5a524;
+  --color-on-saffron: #3b2600;
+  --color-danger: #c2412d;
+  --color-scrim: rgb(5 12 8 / 0.48);
+  --color-transparent: transparent;
+
+  /* Monogram tones, from Basil and Saffron only: a tint, a deeper tint for the gradient, and an
+     ink that keeps at least 4.5:1 on both. Chosen by category. Dark values below. */
+  --color-mono-basil: #dcefe3;
+  --color-mono-basil-2: #c2e2cd;
+  --color-on-mono-basil: #0b5a3d;
+  --color-mono-sage: #e4ece0;
+  --color-mono-sage-2: #cfdcc8;
+  --color-on-mono-sage: #38552f;
+  --color-mono-olive: #eceacf;
+  --color-mono-olive-2: #dcd8b0;
+  --color-on-mono-olive: #545019;
+  --color-mono-saffron: #fdeccb;
+  --color-mono-saffron-2: #f9d995;
+  --color-on-mono-saffron: #744600;
+  --color-mono-terracotta: #f7e0d7;
+  --color-mono-terracotta-2: #efc5b4;
+  --color-on-mono-terracotta: #8a3720;
+  --color-mono-sand: #f2e8d9;
+  --color-mono-sand-2: #e4d3ba;
+  --color-on-mono-sand: #654d31;
+
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 24px;
+  --text-xl: 22px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+
+  --radius-input: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+
+  --shadow-1: 0 1px 2px rgb(21 32 26 / 0.06);
+  --shadow-2: 0 4px 16px rgb(21 32 26 / 0.08);
+  --shadow-3: 0 12px 32px rgb(21 32 26 / 0.16);
+
+  --animate-sheet-in: sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 180ms ease-out;
+
+  @keyframes sheet-in {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* Short phone screens (360x800, 390x844): Welcome tightens so Join and Sign in sit above the fold. */
+@custom-variant short (@media (max-height: 860px));
+
+:root {
+  color-scheme: light;
+  --tabbar-h: 64px;
+  --actionbar-h: 76px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@layer base {
+  /* Dark tokens: an explicit choice in Me, or the system setting when no choice was made. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: #0e1411;
+    --color-surface: #151d18;
+    --color-surface-2: #1c2620;
+    --color-segment: #34463c;
+    --color-ink: #e8eee9;
+    --color-muted: #9aa79f;
+    --color-line: #26322b;
+    --color-brand: #4fc48c;
+    --color-on-brand: #05210f;
+    --color-brand-soft: #173326;
+    --color-saffron: #f7b84b;
+    --color-on-saffron: #3b2600;
+    --color-danger: #ff8a73;
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --color-mono-basil: #15382a;
+    --color-mono-basil-2: #1c4836;
+    --color-on-mono-basil: #8fe0b5;
+    --color-mono-sage: #222e27;
+    --color-mono-sage-2: #2c3b32;
+    --color-on-mono-sage: #bcd6b3;
+    --color-mono-olive: #2d2c18;
+    --color-mono-olive-2: #3b391f;
+    --color-on-mono-olive: #dcd38c;
+    --color-mono-saffron: #38290d;
+    --color-mono-saffron-2: #493512;
+    --color-on-mono-saffron: #f8c766;
+    --color-mono-terracotta: #381e16;
+    --color-mono-terracotta-2: #49281d;
+    --color-on-mono-terracotta: #f5a98f;
+    --color-mono-sand: #31291e;
+    --color-mono-sand-2: #3f3426;
+    --color-on-mono-sand: #e6d2b3;
+    --shadow-1: none;
+    --shadow-2: none;
+    --shadow-3: 0 12px 32px rgb(0 0 0 / 0.5);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-bg: #0e1411;
+      --color-surface: #151d18;
+      --color-surface-2: #1c2620;
+      --color-segment: #34463c;
+      --color-ink: #e8eee9;
+      --color-muted: #9aa79f;
+      --color-line: #26322b;
+      --color-brand: #4fc48c;
+      --color-on-brand: #05210f;
+      --color-brand-soft: #173326;
+      --color-saffron: #f7b84b;
+      --color-on-saffron: #3b2600;
+      --color-danger: #ff8a73;
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-mono-basil: #15382a;
+      --color-mono-basil-2: #1c4836;
+      --color-on-mono-basil: #8fe0b5;
+      --color-mono-sage: #222e27;
+      --color-mono-sage-2: #2c3b32;
+      --color-on-mono-sage: #bcd6b3;
+      --color-mono-olive: #2d2c18;
+      --color-mono-olive-2: #3b391f;
+      --color-on-mono-olive: #dcd38c;
+      --color-mono-saffron: #38290d;
+      --color-mono-saffron-2: #493512;
+      --color-on-mono-saffron: #f8c766;
+      --color-mono-terracotta: #381e16;
+      --color-mono-terracotta-2: #49281d;
+      --color-on-mono-terracotta: #f5a98f;
+      --color-mono-sand: #31291e;
+      --color-mono-sand-2: #3f3426;
+      --color-on-mono-sand: #e6d2b3;
+      --shadow-1: none;
+      --shadow-2: none;
+      --shadow-3: 0 12px 32px rgb(0 0 0 / 0.5);
+    }
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  input, textarea, select {
+    font-size: 16px; /* iOS does not zoom at 16px. */
+  }
+  /* The app draws its own clear button in search boxes. */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.85;
+    cursor: pointer;
+  }
+  :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.92);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.92);
+    }
+  }
+  dialog::backdrop {
+    background: var(--color-scrim);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility pb-tabbar {
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 24px);
+}
+
+/* Detail pages and Add forms: no tab bar, one sticky bar at the bottom instead. */
+@utility pb-actionbar {
+  padding-bottom: calc(var(--actionbar-h) + var(--safe-bottom) + 24px);
+}
