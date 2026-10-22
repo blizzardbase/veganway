@@ -96,7 +96,7 @@ export default function AddPollForm() {
           )}
           {optionsError && <p role="alert" className="text-sm font-semibold text-danger">{optionsError}</p>}
         </fieldset>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <p id="poll-duration" className="text-sm font-bold text-ink">Open for</p>
           <ChipRow label="Open for">
             {DURATIONS.map((d) => (

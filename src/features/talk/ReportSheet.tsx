@@ -33,7 +33,7 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
     if (!target || !reason) return;
     report.mutate({ target_type: target.type, target_id: target.id, reason }, {
       onSuccess: () => {
-        toast.show({ message: 'Thanks. An admin will take a look.' });
+        toast.show({ success: true, message: 'Thanks. An admin will take a look.' });
         close();
       },
     });
@@ -48,10 +48,10 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
             key={r.value}
             className={cx(
               'flex min-h-12 cursor-pointer items-center gap-3 rounded-input border px-4 text-base font-semibold transition',
-              reason === r.value ? 'border-brand bg-brand-soft' : 'border-line bg-surface',
+              reason === r.value ? 'border-ink bg-cool-soft' : 'border-line bg-surface',
             )}
           >
-            <input type="radio" name="report-reason" value={r.value} checked={reason === r.value} onChange={() => setReason(r.value)} className="size-5 accent-[var(--color-brand)]" />
+            <input type="radio" name="report-reason" value={r.value} checked={reason === r.value} onChange={() => setReason(r.value)} className="size-5 accent-[var(--color-ink)]" />
             {r.label}
           </label>
         ))}

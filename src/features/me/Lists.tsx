@@ -27,7 +27,7 @@ function Row({ to, title, sub, hidden, mono }: { to: string; title: string; sub?
 export function PostsList({ posts, loading, failed }: { posts: MyPosts | undefined; loading: boolean; failed: boolean }) {
   if (loading) return <Skeleton className="h-14" />;
   const total = posts ? posts.listings.length + posts.recommendations.length + posts.topics.length + posts.replies.length : 0;
-  if (!posts || total === 0) return failed ? null : <InlineEmpty icon={PenLine} line="You have not posted yet. Your places, recommendations and replies show here." />;
+  if (!posts || total === 0) return failed ? null : <InlineEmpty artwork="posts" icon={PenLine} line="You have not posted yet. Your places, recommendations and replies show here." />;
   return (
     <ul className="flex flex-col">
       {posts.listings.map((x) => <Row key={`l${x.id}`} to={listingPath(x.kind, x.slug)} title={x.name} sub={`Added a ${x.kind}`} hidden={x.hidden} />)}

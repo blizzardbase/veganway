@@ -16,7 +16,7 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
 
 function List({ items }: { items: string[] }) {
   return (
-    <ul className="flex list-disc flex-col gap-1.5 pl-5 text-base">
+    <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
       {items.map((x) => <li key={x}>{x}</li>)}
     </ul>
   );
@@ -35,7 +35,8 @@ export function Privacy() {
               'Your playful name, such as Saffron Chickpea.',
               'A one way fingerprint of your email. We can check it when you sign in, but nobody can turn it back into your email address.',
               'Your password, scrambled so that nobody can read it, not even us.',
-              'Your recovery code, as a keyed fingerprint: a code made from it with a secret key only our server holds. We can check a code you type, but nobody can read your code back from it.',
+              'A fingerprint of each password reset link, its expiry and whether it has been used. The link works once for 30 minutes.',
+              'Some older accounts still have an unused credential fingerprint. It cannot reset a password.',
               'For at most two days, a keyed fingerprint of your IP address, used only to slow down abuse such as password guessing. It cannot be turned back into your IP address.',
               'What you post and how you vote: places, products, services, recommendations, offers, discussions, polls, replies, upvotes and saved places.',
               'Anything you choose to add to your profile: a display name, a short bio and a photo. All optional.',
@@ -44,7 +45,7 @@ export function Privacy() {
         </Block>
 
         <Block title="Signing up with an email that is taken">
-          <p>If you sign up with an email that already has an account, the app says so. That means someone who knows your email could learn that you have an account here. A burner email is the most private choice.</p>
+          <p>If you sign up with an email that already has an account, the app says so. That means someone who knows your email could learn that you have an account here. Use an email you can open. We only use it to send you a reset link, and we never store it.</p>
         </Block>
 
         <Block title="What we never store">
@@ -57,7 +58,12 @@ export function Privacy() {
               'Your device, browser or app details.',
             ]}
           />
-          <p>We never send email, and we never ask for your real name.</p>
+          <p>We only send email when you request a password reset link. We never ask for your real name.</p>
+        </Block>
+
+        <Block title="Password reset emails">
+          <p>Enter the email you joined with to request a reset link. We look up its fingerprint and send to the address you just typed. We never store or log the address. Reset requests give the same answer whether an account exists or not.</p>
+          <p>Resend delivers the message and receives your address and the reset link. Your email provider receives the message too. The email has no tracking pixel, link tracking or images.</p>
         </Block>
 
         <Block title="What our hosts see">
@@ -80,14 +86,14 @@ export function Privacy() {
 
         <Block title="Delete your account">
           <p>
-            Go to <Link to="/me" className="-my-3 inline-flex min-h-11 min-w-11 items-center justify-center font-bold text-brand underline">Me</Link>, then Delete account. We remove your email fingerprint, your password, your recovery code, your profile and its photo, and every photo of yours that no post still shows. What you posted stays, shown as Former member, so conversations still make sense.
+            Go to <Link to="/me" className="-my-3 inline-flex min-h-11 min-w-11 items-center justify-center font-bold text-ink underline">Me</Link>, then Delete account. We remove your email fingerprint, your password, your reset links, your profile and its photo, and every photo of yours that no post still shows. What you posted stays, shown as Former member, so conversations still make sense.
           </p>
         </Block>
 
         <Block title="Check the code">
           <p>
             The source code is public under the MIT licence:{' '}
-            <a href={SOURCE} target="_blank" rel="noopener noreferrer nofollow ugc" className="inline-flex min-h-11 items-center font-bold break-all text-brand underline">{SOURCE}</a>
+            <a href={SOURCE} target="_blank" rel="noopener noreferrer nofollow ugc" className="inline-flex min-h-11 items-center font-bold break-all text-ink underline">{SOURCE}</a>
           </p>
         </Block>
       </div>

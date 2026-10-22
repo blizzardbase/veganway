@@ -5,8 +5,6 @@ import { isIPv4, isIPv6 } from 'node:net';
 export interface Keys {
   /** HMAC key for email_hmac. */
   email: Buffer;
-  /** HMAC key for stored recovery codes. */
-  recovery: Buffer;
   /** HMAC key for daily IP keys used by rate limits. Raw IPs are never stored. */
   ip: Buffer;
 }
@@ -16,7 +14,7 @@ export function deriveKeys(serverSecret: string): Keys {
     throw new Error('SERVER_SECRET must be at least 32 bytes');
   }
   const sub = (info: string) => Buffer.from(hkdfSync('sha256', serverSecret, 'veganway-dxb-v2', info, 32));
-  return { email: sub('email'), recovery: sub('recovery'), ip: sub('ip') };
+  return { email: sub('email'), ip: sub('ip') };
 }
 
 export function hmac(key: Buffer, data: string): string {
@@ -59,12 +57,6 @@ export function ipKey(keys: Keys, ip: string, now = new Date()): string {
   return hmac(keys.ip, `${now.toISOString().slice(0, 10)}|${ipBucket(ip)}`);
 }
 
-export function safeEqualHex(a: string, b: string): boolean {
-  const ba = Buffer.from(a, 'hex');
-  const bb = Buffer.from(b, 'hex');
-  return ba.length === bb.length && ba.length > 0 && timingSafeEqual(ba, bb);
-}
-
 export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
@@ -102,30 +94,3 @@ export const scryptHasher: PasswordHasher = {
     return expected.length === actual.length && timingSafeEqual(expected, actual);
   },
 };
-
-// Recovery codes: 20 Crockford base32 characters (100 bits), shown as 5 groups of 4.
-const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-
-export function newRecoveryCode(): string {
-  const bytes = randomBytes(20);
-  let out = '';
-  for (const b of bytes) out += CROCKFORD[b & 31];
-  return out;
-}
-
-export function formatRecoveryCode(code: string): string {
-  return code.match(/.{1,4}/g)?.join('-') ?? code;
-}
-
-/** Accepts any spacing, hyphens and case; maps the Crockford look alikes I, L to 1 and O to 0. */
-export function normalizeRecoveryCode(input: string): string {
-  return input.toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0');
-}
-
-export function isRecoveryCodeShape(code: string): boolean {
-  return /^[0-9A-HJKMNP-TV-Z]{20}$/.test(code);
-}
-
-export function recoveryHash(keys: Keys, code: string): string {
-  return hmac(keys.recovery, normalizeRecoveryCode(code));
-}

@@ -40,7 +40,7 @@ function EditForm({ profile, onDone }: { profile: Profile; onDone: () => void })
     setFormError(null);
     try {
       await update.mutateAsync({ displayName: displayName.trim() || null, bio: bio.trim() || null, avatarPhotoId: avatar.id });
-      toast.show({ message: 'Profile saved.' });
+      toast.show({ success: true, message: 'Profile saved.' });
       onDone();
     } catch (err) {
       const field = err instanceof ApiError ? err.field : undefined;
@@ -54,7 +54,7 @@ function EditForm({ profile, onDone }: { profile: Profile; onDone: () => void })
       <div className="flex items-center gap-4">
         <Avatar name={displayName || profile.pseudonym} src={avatar.url} size="lg" />
         <div className="flex flex-col gap-1">
-          <label className="inline-flex h-11 cursor-pointer items-center gap-2 text-sm font-bold text-brand">
+          <label className="inline-flex h-11 cursor-pointer items-center gap-2 text-sm font-bold text-ink">
             <ImagePlus size={18} aria-hidden="true" />
             {uploading ? 'Adding photo' : avatar.url ? 'Change photo' : 'Add a photo'}
             <input ref={fileRef} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(e) => void onPhoto(e.target.files?.[0])} />

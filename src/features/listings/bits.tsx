@@ -9,7 +9,7 @@ export function VeganStatusTag({ status }: { status: VeganStatus | string }) {
   const label = veganStatusLabel(status);
   if (!label) return null;
   return (
-    <Tag tone={status === 'vegan_options' ? 'plain' : 'soft'}>
+    <Tag tone="soft" className={status === 'vegan_options' ? 'vegan-options-tag' : undefined}>
       <Leaf size={12} aria-hidden="true" />
       {label}
     </Tag>

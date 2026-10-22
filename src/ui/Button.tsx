@@ -8,7 +8,7 @@ export type ButtonSize = 'md' | 'lg';
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-brand text-on-brand shadow-1 hover:brightness-110 active:brightness-95',
   secondary: 'bg-surface text-ink border border-line hover:bg-surface-2',
-  ghost: 'bg-transparent text-brand hover:bg-brand-soft',
+  ghost: 'bg-transparent text-ink hover:bg-surface-2',
   danger: 'bg-transparent text-danger border border-line hover:bg-surface-2',
   saffron: 'bg-saffron text-on-saffron hover:brightness-105',
 };
@@ -21,7 +21,7 @@ const SIZES: Record<ButtonSize, string> = {
 /** Class names for a button look, for use on links too. */
 export function buttonClass(variant: ButtonVariant = 'primary', size: ButtonSize = 'lg', block = false, extra?: string): string {
   return cx(
-    'inline-flex items-center justify-center gap-2 rounded-input font-bold select-none transition-[filter,background-color,transform]',
+    'pressable inline-flex items-center justify-center gap-2 rounded-input font-bold select-none transition-[filter,background-color,transform]',
     'disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:pointer-events-none',
     VARIANTS[variant],
     SIZES[size],

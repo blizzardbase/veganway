@@ -1,3 +1,4 @@
+import { Tick } from '../../ui/Tick';
 import { ArrowBigUp } from 'lucide-react';
 import { cx } from '../../lib/cx';
 
@@ -16,11 +17,11 @@ export function UpvoteButton({ count, upvoted, onToggle, label = 'Upvote', iconO
       aria-label={`${label}, ${count} ${count === 1 ? 'upvote' : 'upvotes'}`}
       className={cx(
         'inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-3 text-sm font-bold transition active:scale-95',
-        upvoted ? 'bg-brand-soft text-brand' : 'text-muted hover:bg-surface-2 hover:text-ink',
+        upvoted ? 'bg-cool-soft text-cool' : 'text-muted hover:bg-surface-2 hover:text-ink',
       )}
     >
       <ArrowBigUp size={22} strokeWidth={upvoted ? 2.4 : 1.9} fill={upvoted ? 'currentColor' : 'none'} aria-hidden="true" />
-      {count > 0 ? <span className="tabular-nums">{count}</span> : !iconOnly && <span>Upvote</span>}
+      {count > 0 ? <Tick value={count} /> : !iconOnly && <span>Upvote</span>}
     </button>
   );
 }

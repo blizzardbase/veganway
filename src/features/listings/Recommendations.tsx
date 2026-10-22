@@ -2,7 +2,7 @@
 // Reused by the services profile: <Recommendations slug=... /> and <RecommendationComposer slug=... />.
 import { useState, type FormEvent } from 'react';
 import { ArrowBigUp, MessageSquareText, Tag as TagIcon } from 'lucide-react';
-import { Avatar, Button, Field, InlineEmpty, ListSkeleton, Sheet, useToast } from '../../ui';
+import { Avatar, Button, Field, InlineEmpty, Skeleton, Sheet, useToast } from '../../ui';
 import { cx } from '../../lib/cx';
 import { ApiError, errorMessage } from '../../api/client';
 import { useRequireAccount } from '../auth/Gate';
@@ -34,7 +34,7 @@ function RecommendationItem({ rec, slug, byCreator }: { rec: Recommendation; slu
           }))}
           className={cx(
             'inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full px-3 text-sm font-bold transition',
-            rec.upvotedByMe ? 'bg-brand-soft text-brand' : 'text-muted hover:bg-surface-2',
+            rec.upvotedByMe ? 'bg-warm-soft text-warm' : 'text-muted hover:bg-surface-2',
           )}
         >
           <ArrowBigUp size={20} aria-hidden="true" className={rec.upvotedByMe ? 'fill-current' : undefined} />
@@ -43,8 +43,8 @@ function RecommendationItem({ rec, slug, byCreator }: { rec: Recommendation; slu
       </header>
       {rec.body && (
         byCreator ? (
-          <div className="flex flex-col gap-1 rounded-input bg-brand-soft px-3 py-2">
-            <p className="text-xs font-extrabold tracking-wide text-brand uppercase">What to order</p>
+          <div className="flex flex-col gap-1 rounded-input bg-warm-soft px-3 py-2">
+            <p className="text-xs font-extrabold tracking-wide text-warm uppercase">What to order</p>
             <p className="text-base break-words whitespace-pre-line">{rec.body}</p>
           </div>
         ) : <p className="text-base break-words whitespace-pre-line">{rec.body}</p>
@@ -71,7 +71,7 @@ function RecommendationItem({ rec, slug, byCreator }: { rec: Recommendation; slu
 export function Recommendations({ slug, creator }: { slug: string; creator?: string }) {
   const q = useRecommendations(slug);
   const items = flatUnique(q.data?.pages);
-  if (q.isPending) return <ListSkeleton count={2} label="Loading recommendations" />;
+  if (q.isPending) return <div role="status" aria-label="Loading recommendations" className="min-h-11"><Skeleton className="h-11 w-full" /></div>;
   if (q.isError) return <p className="text-sm text-muted">{errorMessage(q.error)}</p>;
   if (items.length === 0) {
     return <InlineEmpty icon={MessageSquareText} line="No recommendations yet. Be the first to say what to order." />;
@@ -126,7 +126,7 @@ export function RecommendationSheet({ slug, listingName, open, onClose }: { slug
       setBody('');
       setPhoto(null);
       onClose();
-      toast.show({ message: 'Thanks. Your recommendation is up.' });
+      toast.show({ success: true, message: 'Thanks. Your recommendation is up.' });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : errorMessage(err));
     }

@@ -6,7 +6,7 @@ Use it at https://veganway-dxb.vercel.app. This repository is the complete sourc
 
 ## Privacy in one paragraph
 
-Accounts need only an email and a password. Any email works, even a burner. The server stores an HMAC of the email, never the email itself, and never sends email. A recovery code shown once at sign up resets a forgotten password. There is no analytics, no third party script, font or image, and a strict Content Security Policy. The database and logs hold no IP address, user agent or email.
+Accounts need only an email and a password. Use an email you can open. We only use it to send you a reset link, and we never store it. The server stores an HMAC of the email, never the email itself, and sends a password reset link only when requested. The group admin decided on 17 October 2026 to remove recovery codes. Reset links last 30 minutes and work once. Resend receives the address just typed and the message for delivery. Open and click tracking are disabled before sending. There is no analytics, no third party script, font or image, and a strict Content Security Policy. The database and logs hold no IP address, user agent or email.
 
 ## Run it locally
 
@@ -17,7 +17,7 @@ npm ci
 npm run dev
 ```
 
-`npm run dev` starts the API and the Vite dev server together on http://localhost:4317. With no `DATABASE_URL` it uses PGlite, an in process Postgres, stored in `data/dev-pglite`, and applies migrations on start. With no `SERVER_SECRET` it creates a local one in `data/dev-secret`. The `data/` folder is git ignored.
+`npm run dev` starts the API and the Vite dev server together on http://localhost:4317. With no `DATABASE_URL` it uses PGlite, an in process Postgres, stored in `data/dev-pglite`, and applies migrations on start. With no `SERVER_SECRET` it creates a local one in `data/dev-secret`. The `data/` folder is git ignored. Development mail is recorded in memory and never sent. Playwright uses a private temporary mail folder and an in memory database; its JSON messages contain synthetic addresses only. `VW_E2E_MAIL_DIR` is honored only by that isolated test server.
 
 To try the production build locally, with the same security headers as Vercel:
 
@@ -55,9 +55,11 @@ See `.env.example`. Secrets come from the environment only. Never commit `.env.l
 | Variable | Where | Meaning |
 | --- | --- | --- |
 | `DATABASE_URL` | Vercel, migrate, admin | `postgres://` (Neon, pooled) or `pglite://memory` or `pglite://<dir>` |
-| `SERVER_SECRET` | Vercel, admin | 32 or more random bytes. HKDF derives the email, recovery and rate limit keys. Losing it locks every account out |
+| `SERVER_SECRET` | Vercel, admin | 32 or more random bytes. HKDF derives the email and rate limit keys. Losing it locks every account out |
 | `APP_ORIGIN` | Vercel, local | The exact origin people use. Writes from any other origin are refused. `https` switches the cookie to `__Host-vw_session` |
+| `RESEND_API_KEY`, `MAIL_FROM` | production | Resend sending access key limited to the sender's domain, and a verified sender. Each reset is one call to `POST /emails`. Keep open and click tracking off for the domain in the Resend dashboard. Without these, reset is unavailable. Never use real credentials in tests |
 | `BLOB_READ_WRITE_TOKEN` | Vercel | Vercel Blob public store for photos |
+| `VW_E2E_BROWSER_PATH` | tests | Optional executable path for the isolated Playwright browser, such as Brave |
 | `PORT`, `HOST` | local | Local server address. Defaults 4317 and 127.0.0.1 |
 
 ## Layout

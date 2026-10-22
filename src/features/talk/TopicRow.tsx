@@ -1,4 +1,5 @@
 // One topic in a list: title, first line, author, age, replies, upvotes, and an inline poll.
+import { useCategoryAccent } from './categoryAccent';
 import { Link } from 'react-router';
 import { MessageCircle, Pin } from 'lucide-react';
 import type { TopicSummary } from '../../../shared/types/talk';
@@ -11,13 +12,14 @@ import { PollBlock } from './PollBlock';
 import { UpvoteButton } from './UpvoteButton';
 
 export function TopicRow({ topic }: { topic: TopicSummary }) {
+  const category = useCategoryAccent(topic.id);
   const upvote = useTopicUpvote(topic.id);
   const requireAccount = useRequireAccount();
   const href = `/talk/${topic.id}`;
   return (
-    <Card padded={false} className="flex flex-col gap-3 p-4" data-testid="topic-row">
+    <Card padded={false} className="topic-accent flex flex-col gap-3 p-4" data-category={category} data-testid="topic-row">
       {(topic.pinned || topic.kind === 'poll' || topic.hidden) && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {topic.pinned && <Tag tone="saffron"><Pin size={12} aria-hidden="true" />Pinned</Tag>}
           {topic.kind === 'poll' && <Tag>Poll</Tag>}
           {topic.hidden && <Tag tone="plain">Hidden</Tag>}

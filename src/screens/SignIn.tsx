@@ -40,6 +40,7 @@ export function SignIn() {
       <TopBar back="/welcome" />
       <h1 className="text-2xl font-extrabold">Welcome back</h1>
       <p className="mt-2 text-base text-muted">Sign in with the email and password you joined with.</p>
+      {params.get('reset') === 'done' && <p role="status" className="mt-4 text-base font-semibold text-brand">Password changed. Sign in with your new password.</p>}
       <form className="mt-6 flex flex-1 flex-col gap-5" onSubmit={onSubmit} noValidate>
         <Field
           label="Email"
@@ -61,14 +62,14 @@ export function SignIn() {
           required
         />
         {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
-        <Link to={`/reset${keepNext}`} className="inline-flex min-h-11 items-center self-start text-sm font-bold text-brand">
-          Forgot your password? Use your recovery code
+        <Link to="/forgot-password" className="inline-flex min-h-11 items-center self-start text-sm font-bold text-ink">
+          Forgot password?
         </Link>
         <div className="mt-auto flex flex-col gap-4 pt-6">
           <Button type="submit" block busy={signIn.isPending} busyLabel="Signing in">Sign in</Button>
           <p className="text-center text-sm text-muted">
             New here?{' '}
-            <Link to={`/join${keepNext}`} className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 font-bold text-brand">Join</Link>
+            <Link to={`/join${keepNext}`} className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 font-bold text-ink">Join</Link>
           </p>
         </div>
       </form>

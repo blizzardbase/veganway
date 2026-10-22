@@ -46,9 +46,9 @@ export function PhotoPicker({ value, onChange, onBusy, label = 'Add a photo' }: 
         <label
           htmlFor={id}
           aria-busy={busy || undefined}
-          className="flex h-12 w-fit cursor-pointer items-center gap-2 rounded-input border border-dashed border-line bg-surface px-4 text-base font-semibold text-ink transition hover:bg-surface-2 focus-within:outline-2 focus-within:outline-brand"
+          className="flex h-12 w-fit cursor-pointer items-center gap-2 rounded-input border border-dashed border-line bg-surface px-4 text-base font-semibold text-ink transition hover:bg-surface-2 focus-within:outline-2 focus-within:outline-cool"
         >
-          <Camera size={20} aria-hidden="true" className="text-brand" />
+          <Camera size={20} aria-hidden="true" className="text-ink" />
           {busy ? 'Uploading photo' : label}
           <input
             ref={input}

@@ -5,7 +5,7 @@ export function ServiceQuestion() {
   return (
     // One block, centred on the screen: the question, then its two answers right under it.
     <div className="flex flex-1 flex-col justify-center py-8">
-      <div className="flex size-16 items-center justify-center rounded-full bg-brand-soft text-brand">
+      <div className="flex size-16 items-center justify-center rounded-full bg-surface-2 text-ink">
         <ChefHat size={30} aria-hidden="true" />
       </div>
       <h1 className="mt-6 text-2xl font-extrabold">Do you bake, cook or run a vegan service?</h1>

@@ -222,6 +222,7 @@ export function router(deps: Deps): Router {
       if (user.role === 'admin') fail(409, 'Remove the admin role before banning this member.', 'is_admin');
       await q.query('UPDATE users SET banned_at = coalesce(banned_at, now()) WHERE id = $1', [id]);
       await q.query('DELETE FROM sessions WHERE user_id = $1', [id]);
+      await q.query('UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [id]);
       const recs = await q.query(`UPDATE recommendations SET hidden = true WHERE user_id = $1 AND NOT hidden RETURNING id`, [id]);
       const topics = await q.query(`UPDATE topics SET hidden = true WHERE user_id = $1 AND NOT hidden RETURNING id`, [id]);
       const replies = await q.query(`UPDATE replies SET hidden = true WHERE user_id = $1 AND NOT hidden RETURNING id`, [id]);

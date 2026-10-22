@@ -1,4 +1,6 @@
 // One discussion or poll: title, body, author, linked listings, poll, replies and a sticky composer.
+import type { LinkedListing } from '../../shared/types/talk';
+import { useCategoryAccent } from '../features/talk/categoryAccent';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Flag, MessagesSquare, Pin, Share2 } from 'lucide-react';
@@ -12,6 +14,19 @@ import { PollBlock } from '../features/talk/PollBlock';
 import { Replies } from '../features/talk/Replies';
 import { ReportSheet, type ReportTarget } from '../features/talk/ReportSheet';
 import { UpvoteButton } from '../features/talk/UpvoteButton';
+
+
+function LinkedListingChip({ listing: l }: { listing: LinkedListing }) {
+  const category = useCategoryAccent(undefined, l.slug);
+  return (
+    <li data-category={category} className="linked-category min-w-0 max-w-full">
+      <Link to={listingHref(l)} className="inline-flex h-11 max-w-full items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-surface-2">
+        <span className="min-w-0 truncate" title={l.name}>{l.name}</span>
+        <span className="shrink-0 text-xs font-bold text-muted">{l.kind === 'place' ? 'Place' : l.kind === 'product' ? 'Product' : 'Service'}</span>
+      </Link>
+    </li>
+  );
+}
 
 export function Topic() {
   const { id } = useParams();
@@ -66,10 +81,10 @@ export function Topic() {
                 type="button"
                 aria-label={t.pinned ? 'Unpin' : 'Pin to the top'}
                 onClick={() => pin.mutate(!t.pinned, {
-                  onSuccess: (res) => toast.show({ message: res.pinned ? 'Pinned' : 'Unpinned' }),
+                  onSuccess: (res) => toast.show({ success: true, message: res.pinned ? 'Pinned' : 'Unpinned' }),
                   onError: (err) => toast.show({ message: errorMessage(err) }),
                 })}
-                className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-ink transition hover:bg-surface-2"
+                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-ink transition hover:bg-surface-2"
               >
                 <Pin size={18} aria-hidden="true" />
                 {t.pinned ? 'Unpin' : 'Pin'}
@@ -96,7 +111,7 @@ export function Topic() {
 
       <article className="flex flex-col gap-4 pb-6">
         {(t.pinned || t.hidden) && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {t.pinned && <Tag tone="saffron"><Pin size={12} aria-hidden="true" />Pinned</Tag>}
             {t.hidden && <Tag tone="plain">Hidden</Tag>}
           </div>
@@ -115,7 +130,7 @@ export function Topic() {
               {t.tags.map((tag) => (
                 <li key={tag}>
                   <Link to={`/talk?tag=${encodeURIComponent(tag)}`} className="group inline-flex h-11 items-center">
-                    <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-bold text-muted group-hover:text-ink">#{tag}</span>
+                    <span className="rounded-full bg-surface-2 px-3 py-0.5 text-xs font-bold text-muted group-hover:text-ink">#{tag}</span>
                   </Link>
                 </li>
               ))}
@@ -129,12 +144,7 @@ export function Topic() {
             <h2 className="text-sm font-bold text-muted">Linked</h2>
             <ul className="flex flex-wrap gap-2">
               {t.listings.map((l) => (
-                <li key={l.id} className="min-w-0 max-w-full">
-                  <Link to={listingHref(l)} className="inline-flex h-11 max-w-full items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-surface-2">
-                    <span className="min-w-0 truncate" title={l.name}>{l.name}</span>
-                    <span className="shrink-0 text-xs font-bold text-muted">{l.kind === 'place' ? 'Place' : l.kind === 'product' ? 'Product' : 'Service'}</span>
-                  </Link>
-                </li>
+                <LinkedListingChip key={l.id} listing={l} />
               ))}
             </ul>
           </div>

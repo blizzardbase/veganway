@@ -125,7 +125,7 @@ export function Replies({ targetType, targetId, title = 'Replies', composer = 's
       )}
       {isError && !isFetchNextPageError && (
         <p className="text-sm text-muted">
-          Replies did not load. <button type="button" className="h-11 font-bold text-brand underline" onClick={() => void refetch()}>Try again</button>
+          Replies did not load. <button type="button" className="h-11 font-bold text-ink underline" onClick={() => void refetch()}>Try again</button>
         </p>
       )}
       {data && items.length === 0 && (
@@ -192,7 +192,7 @@ function ReplyItem({ reply, nested, deleted, onUpvote, onReply, onDelete, onRepo
           {reply.hidden && <Tag tone="plain">Hidden</Tag>}
         </p>
         <p className="text-base break-words whitespace-pre-line">{reply.body}</p>
-        <div className="-ml-3 flex items-center gap-0.5">
+        <div className="-ml-3 flex items-center gap-1">
           <UpvoteButton count={reply.upvotes} upvoted={reply.upvoted} onToggle={onUpvote} label="Upvote reply" />
           <button type="button" onClick={onReply} className="inline-flex h-11 items-center gap-1 rounded-full px-3 text-sm font-bold text-muted hover:bg-surface-2 hover:text-ink">
             <ReplyIcon size={16} aria-hidden="true" /> Reply

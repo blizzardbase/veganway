@@ -5,7 +5,7 @@ import { areaLabel, VEGAN_STATUS_LABEL } from '../../../shared/types/listings';
 
 export function CategoryChips({ value, onChange }: { value: ServiceCategory | null; onChange: (c: ServiceCategory) => void }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <span className="text-sm font-bold">Category</span>
       <ChipRow label="Category">
         {SERVICE_CATEGORIES.map((c) => (
@@ -19,7 +19,7 @@ export function CategoryChips({ value, onChange }: { value: ServiceCategory | nu
 /** Fully vegan or Vegan options. Nothing is chosen until the member picks. */
 export function VeganStatusChips({ value, onChange, error }: { value: ServiceVeganStatus | null; onChange: (v: ServiceVeganStatus) => void; error?: string | null }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <span className="text-sm font-bold">Is everything you make vegan?</span>
       <div role="group" aria-label="Vegan status" className="flex flex-wrap gap-2">
         {SERVICE_VEGAN_STATUSES.map((v) => (
@@ -33,7 +33,7 @@ export function VeganStatusChips({ value, onChange, error }: { value: ServiceVeg
 
 export function AreaChips({ value, onChange }: { value: string | null; onChange: (a: string) => void }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <span className="text-sm font-bold">Area</span>
       <ChipRow label="Area">
         {SERVICE_AREAS.map((a) => (

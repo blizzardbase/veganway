@@ -4,8 +4,8 @@ import { ButtonLink } from '../../ui';
 
 export function WelcomeCard() {
   return (
-    <section aria-labelledby="welcome-h" data-testid="welcome-card" className="flex flex-col gap-4 rounded-card border border-line bg-brand-soft p-5">
-      <span className="flex size-12 items-center justify-center rounded-full bg-brand text-on-brand">
+    <section aria-labelledby="welcome-h" data-testid="welcome-card" className="welcome-card flex flex-col gap-4 rounded-card border border-line bg-surface-2 p-5">
+      <span className="flex size-12 items-center justify-center rounded-full bg-ink text-bg">
         <Sprout size={24} aria-hidden="true" />
       </span>
       <div className="flex flex-col gap-2">

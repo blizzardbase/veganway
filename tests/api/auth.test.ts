@@ -5,27 +5,22 @@ import { DEFAULT_LIMITS } from '../../server/lib/rate.js';
 import { runAdminCommand, parseAdminArgs } from '../../server/cli/admin.js';
 import { containsContact } from '../../server/lib/contact.js';
 import { isReservedName } from '../../server/lib/pseudonym.js';
-import type { AccountWithCodeResponse, AuthResponse, MeResponse } from '../../shared/types.js';
-
-const CROCKFORD20 = /^[0-9A-HJKMNP-TV-Z]{20}$/;
+import type { AuthResponse, MeResponse } from '../../shared/types.js';
 
 describe('signup', () => {
   let app: TestApp;
   before(async () => { app = await makeTestApp(); });
   after(async () => { await app.close(); });
 
-  test('returns a pseudonym and a 20 character recovery code, and signs the member in', async () => {
+  test('returns a pseudonym without a recovery code, and signs the member in', async () => {
     const agent = app.agent();
     const email = uniqueEmail('Signup');
-    const res = await agent.post<AccountWithCodeResponse>('/api/auth/signup', { email: `  ${email.toUpperCase()} `, password: 'a long password' });
+    const res = await agent.post<AuthResponse>('/api/auth/signup', { email: `  ${email.toUpperCase()} `, password: 'a long password' });
     assert.equal(res.status, 201);
     assert.match(res.body.user.pseudonym, /^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/);
     assert.equal(res.body.user.pseudonymConfirmed, false);
     assert.equal(res.body.user.role, 'member');
-    assert.match(res.body.recoveryCode, /^[0-9A-Z]{4}(-[0-9A-Z]{4}){4}$/);
-    const raw = res.body.recoveryCode.replace(/-/g, '');
-    assert.equal(raw.length, 20);
-    assert.match(raw, CROCKFORD20);
+    assert.ok(!('recoveryCode' in res.body));
     assert.ok(res.body.csrf);
     const cookie = res.headers.getSetCookie().join('\n');
     assert.match(cookie, /vw_session=/);
@@ -76,7 +71,7 @@ describe('signup', () => {
 
   test('shuffle changes the pseudonym until it is confirmed, then refuses', async () => {
     const agent = app.agent();
-    const first = await agent.post<AccountWithCodeResponse>('/api/auth/signup', { email: uniqueEmail(), password: 'a long password' });
+    const first = await agent.post<AuthResponse>('/api/auth/signup', { email: uniqueEmail(), password: 'a long password' });
     const names = new Set([first.body.user.pseudonym]);
     for (let i = 0; i < 3; i++) {
       const s = await agent.post<AuthResponse>('/api/auth/shuffle');
@@ -184,53 +179,6 @@ describe('CSRF and Origin', () => {
   });
 });
 
-describe('reset with recovery code', () => {
-  let app: TestApp;
-  before(async () => { app = await makeTestApp(); });
-  after(async () => { await app.close(); });
-
-  test('works once, the old code then fails, a new code is issued, and old sessions are dead', async () => {
-    const member = await signUp(app.agent());
-    const otherDevice = app.agent();
-    assert.equal((await otherDevice.post('/api/auth/login', { email: member.email, password: member.password })).status, 200);
-
-    const resetter = app.agent();
-    const reset = await resetter.post<AccountWithCodeResponse>('/api/auth/reset', {
-      email: member.email,
-      recoveryCode: member.recoveryCode.toLowerCase().replace(/-/g, ' '),
-      newPassword: 'a brand new password',
-    });
-    assert.equal(reset.status, 200);
-    const newCode = reset.body.recoveryCode;
-    assert.match(newCode.replace(/-/g, ''), CROCKFORD20);
-    assert.notEqual(newCode, member.recoveryCode);
-    assert.equal((await resetter.get<MeResponse>('/api/me')).body.user?.id, member.user.id, 'reset signs in');
-
-    // Old sessions are dead.
-    assert.equal((await member.agent.get<MeResponse>('/api/me')).body.user, null);
-    assert.equal((await otherDevice.get<MeResponse>('/api/me')).body.user, null);
-
-    // The old code fails now.
-    const reuse = await app.agent().post('/api/auth/reset', { email: member.email, recoveryCode: member.recoveryCode, newPassword: 'yet another password' });
-    assert.equal(reuse.status, 401);
-
-    // Old password fails, new password works, and the new code works.
-    assert.equal((await app.agent().post('/api/auth/login', { email: member.email, password: member.password })).status, 401);
-    assert.equal((await app.agent().post('/api/auth/login', { email: member.email, password: 'a brand new password' })).status, 200);
-    const second = await app.agent().post('/api/auth/reset', { email: member.email, recoveryCode: newCode, newPassword: 'third password here' });
-    assert.equal(second.status, 200);
-  });
-
-  test('a wrong code or an unknown email both fail the same way', async () => {
-    const member = await signUp(app.agent());
-    const wrongCode = await app.agent().post<{ code: string }>('/api/auth/reset', { email: member.email, recoveryCode: 'ABCD-EFGH-JKMN-PQRS-TVWX', newPassword: 'a brand new password' });
-    const unknown = await app.agent().post<{ code: string }>('/api/auth/reset', { email: uniqueEmail(), recoveryCode: member.recoveryCode, newPassword: 'a brand new password' });
-    assert.equal(wrongCode.status, 401);
-    assert.equal(unknown.status, 401);
-    assert.equal(wrongCode.body.code, unknown.body.code);
-  });
-});
-
 describe('signed in account changes', () => {
   let app: TestApp;
   before(async () => { app = await makeTestApp(); });
@@ -247,15 +195,6 @@ describe('signed in account changes', () => {
     assert.ok((await member.agent.get<MeResponse>('/api/me')).body.user);
     assert.equal((await other.get<MeResponse>('/api/me')).body.user, null);
     assert.equal((await app.agent().post('/api/auth/login', { email: member.email, password: 'a second password' })).status, 200);
-  });
-
-  test('a new recovery code needs the password and replaces the old one', async () => {
-    const member = await signUp(app.agent());
-    assert.equal((await member.agent.post('/api/auth/recovery-code', { password: 'not the password' })).status, 401);
-    const res = await member.agent.post<{ recoveryCode: string }>('/api/auth/recovery-code', { password: member.password });
-    assert.equal(res.status, 200);
-    assert.equal((await app.agent().post('/api/auth/reset', { email: member.email, recoveryCode: member.recoveryCode, newPassword: 'whatever new pass' })).status, 401);
-    assert.equal((await app.agent().post('/api/auth/reset', { email: member.email, recoveryCode: res.body.recoveryCode, newPassword: 'whatever new pass' })).status, 200);
   });
 });
 

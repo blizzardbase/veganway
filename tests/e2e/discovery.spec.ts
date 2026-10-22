@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { AccountWithCodeResponse } from '../../shared/types';
+import type { AuthResponse } from '../../shared/types';
 
 async function member(page: Page, origin: string) {
   await page.context().clearCookies();
@@ -8,7 +8,7 @@ async function member(page: Page, origin: string) {
     data: { email: `disc.${crypto.randomUUID()}@example.test`, password: 'synthetic password only' },
   });
   expect(response.status()).toBe(201);
-  const signed: AccountWithCodeResponse = await response.json();
+  const signed: AuthResponse = await response.json();
   return { origin, 'x-csrf-token': signed.csrf };
 }
 

@@ -1,7 +1,7 @@
 // The signed in member, through React Query. useMe() is the one source of truth for "who am I".
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, setCsrf } from './client';
-import type { AccountWithCodeResponse, AuthResponse, Me, MeResponse, RecoveryCodeResponse } from '../../shared/types';
+import type { AuthResponse, Me, MeResponse } from '../../shared/types';
 
 export const meKey = ['me'] as const;
 
@@ -31,7 +31,7 @@ function store(qc: QueryClient, res: { user: Me; csrf: string }) {
 export function useSignUp() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { email: string; password: string }) => api.post<AccountWithCodeResponse>('/api/auth/signup', body),
+    mutationFn: (body: { email: string; password: string }) => api.post<AuthResponse>('/api/auth/signup', body),
     onSuccess: (res) => store(qc, res),
   });
 }
@@ -76,23 +76,26 @@ export function useSignOut() {
   });
 }
 
-export function useResetWithCode() {
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (body: { email: string }) => api.post<{ message: string }>('/api/auth/forgot-password', body),
+  });
+}
+
+export function useResetPassword() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { email: string; recoveryCode: string; newPassword: string }) =>
-      api.post<AccountWithCodeResponse>('/api/auth/reset', body),
-    onSuccess: (res) => store(qc, res),
+    mutationFn: (body: { token: string; newPassword: string }) => api.post<{ message: string }>('/api/auth/reset', body),
+    onSuccess: () => {
+      setCsrf(null);
+      qc.clear();
+      qc.setQueryData<MeResponse>(meKey, { user: null, csrf: null });
+    },
   });
 }
 
 export function useChangePassword() {
   return useMutation({
     mutationFn: (body: { currentPassword: string; newPassword: string }) => api.post<AuthResponse>('/api/auth/password', body),
-  });
-}
-
-export function useNewRecoveryCode() {
-  return useMutation({
-    mutationFn: (body: { password: string }) => api.post<RecoveryCodeResponse>('/api/auth/recovery-code', body),
   });
 }

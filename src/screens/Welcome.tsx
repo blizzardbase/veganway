@@ -29,7 +29,7 @@ export function Welcome() {
   const still = useReducedMotion();
   return (
     <m.div
-      className="flex flex-1 flex-col pt-[max(24px,env(safe-area-inset-top))] short:pt-[max(16px,env(safe-area-inset-top))]"
+      className="welcome-screen flex flex-1 flex-col pt-[max(24px,env(safe-area-inset-top))] short:pt-[max(16px,env(safe-area-inset-top))]"
       variants={list}
       initial={still ? false : 'hidden'}
       animate="shown"
@@ -41,14 +41,14 @@ export function Welcome() {
       </m.div>
 
       <m.div variants={item} className="mt-2 flex flex-col gap-2 short:gap-1">
-        <h1 className="text-2xl font-extrabold short:text-[24px] short:leading-[30px]">The Dubai vegan community, in one place.</h1>
+        <h1 className="text-2xl font-extrabold short:text-[24px] short:leading-[30px]"><span className="welcome-first-line">The Dubai vegan community,</span>{' '}in one place.</h1>
         <p className="text-base text-muted">Places, products, home bakers and good talk, shared by members.</p>
       </m.div>
 
-      <m.ul variants={item} className="mt-5 flex flex-col gap-3 short:mt-4 short:gap-2">
+      <m.ul variants={item} className="stagger-list welcome-features mt-5 flex flex-col gap-3 short:mt-4 short:gap-2">
         {VALUES.map(({ icon: Icon, text }) => (
           <li key={text} className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand short:size-8">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink short:size-8">
               <Icon size={18} aria-hidden="true" />
             </span>
             <span className="text-base font-semibold short:text-sm">{text}</span>
@@ -57,8 +57,8 @@ export function Welcome() {
       </m.ul>
 
       <m.p variants={item} className="mt-5 flex items-start gap-2 text-sm text-muted short:mt-4">
-        <ShieldCheck size={18} className="mt-px shrink-0 text-brand" aria-hidden="true" />
-        <span>No phone number. Any email works, even a burner. We never send email and never track you.</span>
+        <ShieldCheck size={18} className="mt-px shrink-0 text-ink" aria-hidden="true" />
+        <span>No phone number. We never store your email. We only email password reset links and never track you.</span>
       </m.p>
 
       <m.div variants={item} className="mt-auto flex flex-col gap-3 pt-6 short:gap-2 short:pt-4">

@@ -4,7 +4,7 @@
 import { Link } from 'react-router';
 import { AnimatePresence, m, useReducedMotion } from 'motion/react';
 import { ArrowUp, Sparkles, TriangleAlert } from 'lucide-react';
-import { Avatar, Button, ButtonLink, EmptyState, SearchPill, Skeleton, Wordmark } from '../ui';
+import { Avatar, Button, ButtonLink, EmptyState, SearchPill, Skeleton, TopBar, Wordmark } from '../ui';
 import { useMe } from '../api/session';
 import { useAddSheet } from '../features/add/AddSheet';
 import { DealsSkeleton, DealsStrip } from '../features/listings/DealsStrip';
@@ -50,21 +50,16 @@ export function Home() {
 
   return (
     <>
-      <header className="flex h-14 items-center justify-between gap-3">
-        <h1 className="sr-only">Home</h1>
-        <Link to="/" aria-label="VeganWay DXB home" className="-ml-1 flex h-11 items-center rounded-input px-1">
-          <Wordmark />
-        </Link>
-        {user ? (
+      <TopBar
+        compactTitle={<><h1 className="sr-only">Home</h1><Link to="/" aria-label="VeganWay DXB home" className="flex h-11 w-fit items-center rounded-input px-2"><Wordmark /></Link></>}
+        actions={user ? (
           <Link to="/me" aria-label={`Me: ${user.displayName || user.pseudonym}`} className="flex size-11 items-center justify-center rounded-full">
             <Avatar name={user.displayName || user.pseudonym} size="sm" className="size-9" />
           </Link>
-        ) : me ? (
-          <ButtonLink to="/join?next=%2F" size="md" className="px-5">Join</ButtonLink>
-        ) : <span className="size-11" aria-hidden="true" />}
-      </header>
+        ) : me ? <ButtonLink to="/join?next=%2F" size="md" className="px-5">Join</ButtonLink> : <span className="size-11" aria-hidden="true" />}
+      />
 
-      <div className="sticky top-0 z-30 -mx-4 bg-bg/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-14 z-30 -mx-4 bg-bg/95 px-4 py-2 backdrop-blur">
         <SearchPill />
       </div>
 
@@ -81,7 +76,7 @@ export function Home() {
             <button
               type="button"
               onClick={() => void showNew()}
-              className="pointer-events-auto inline-flex h-11 items-center gap-1.5 rounded-full bg-brand px-4 text-sm font-extrabold text-on-brand shadow-3"
+              className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full bg-warm-soft px-4 text-sm font-extrabold text-warm shadow-3"
             >
               <ArrowUp size={16} aria-hidden="true" />
               New posts
@@ -92,7 +87,7 @@ export function Home() {
 
       <div className="flex flex-col gap-6 pt-2">
         {me && !user && (
-          <p className="flex items-center gap-3 rounded-card bg-brand-soft py-1 pr-1 pl-4 text-sm font-semibold" data-testid="join-banner">
+          <p className="flex items-center gap-3 rounded-card bg-surface-2 py-1 pr-1 pl-4 text-sm font-semibold" data-testid="join-banner">
             <span className="min-w-0 flex-1">Join to add and vote. Any email works.</span>
             <ButtonLink to="/join?next=%2F" variant="ghost" size="md" className="shrink-0">Join</ButtonLink>
           </p>
@@ -126,7 +121,7 @@ export function Home() {
             ) : (
               <section aria-labelledby="feed-h" className="flex flex-col gap-3">
                 <h2 id="feed-h" className="flex items-center gap-2 text-lg font-extrabold">
-                  <Sparkles size={18} aria-hidden="true" className="text-brand" />
+                  <Sparkles size={18} aria-hidden="true" className="text-ink" />
                   Latest from members
                 </h2>
                 {feed.isError && !items.length ? (
@@ -135,7 +130,7 @@ export function Home() {
                   <EmptyState icon={Sparkles} line="Nothing new yet. Add the first find." action={{ label: 'Add something', onClick: openAdd }} />
                 ) : (
                   <>
-                    <ul className="flex flex-col gap-3">
+                    <ul className="stagger-list flex flex-col gap-3">
                       {items.map((item) => <li key={item.id}><FeedCard item={item} /></li>)}
                     </ul>
                     {feed.isFetchingNextPage && <FeedSkeleton label="Loading more" />}

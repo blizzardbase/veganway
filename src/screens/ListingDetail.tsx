@@ -1,6 +1,7 @@
 // Place or product detail. A service slug opens the services screen instead.
 // No tab bar here: a top bar with Back, Share, Save and Report, and one sticky bar at the bottom
 // with Recommend, Not for me and Add yours.
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { Bookmark, ExternalLink, MapPin, Plus, SearchX, Share2, ShoppingBasket, Tag as TagIcon } from 'lucide-react';
 import { EmptyState, HeroMedia, IconButton, ListSkeleton, Tag, TopBar, useToast } from '../ui';
@@ -30,14 +31,26 @@ function SaveButton({ listing }: { listing: Detail }) {
       onClick={() => requireAccount(() => {
         const next = !listing.saved;
         setSaved.mutate(next, {
-          onSuccess: () => toast.show({ message: next ? 'Saved. Find it in Me.' : 'Removed from saved.', onUndo: () => setSaved.mutate(!next) }),
+          onSuccess: () => toast.show({ success: true, message: next ? 'Saved. Find it in Me.' : 'Removed from saved.', onUndo: () => setSaved.mutate(!next) }),
           onError: (err) => toast.show({ message: errorMessage(err) }),
         });
       })}
     >
-      <Bookmark size={22} aria-hidden="true" className={listing.saved ? 'fill-current text-brand' : undefined} />
+      <Bookmark size={22} aria-hidden="true" className={listing.saved ? 'fill-current text-ink' : undefined} />
     </IconButton>
   );
+}
+
+function ScrollTitle({ name }: { name: string }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const title = document.getElementById('listing-title');
+    if (!title) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 56), { rootMargin: '-56px 0px 0px 0px' });
+    observer.observe(title);
+    return () => observer.disconnect();
+  }, [name]);
+  return <span aria-hidden="true" className={`scroll-title ${visible ? 'is-visible' : ''}`}>{name}</span>;
 }
 
 export function ListingDetail() {
@@ -70,6 +83,7 @@ export function ListingDetail() {
     <>
       <TopBar
         back={parent}
+        compactTitle={<ScrollTitle name={l.name} />}
         actions={(
           <>
             <a
@@ -88,23 +102,23 @@ export function ListingDetail() {
         )}
       />
 
-      <article className="flex flex-col gap-5">
+      <article data-category={l.category.toLowerCase() || 'other'} className="listing-detail flex flex-col gap-5">
         <div data-testid="listing-photo">
-          <HeroMedia name={l.name} category={l.category} kind={l.kind} photoUrl={l.photoUrl} className="-mt-2" />
+          <HeroMedia transitionKey={l.slug} name={l.name} category={l.category} kind={l.kind} photoUrl={l.photoUrl} className="-mt-2" />
           {l.photoUrl && <div className="flex justify-end"><ReportButton targetType="photo" photoUrl={l.photoUrl} variant="text" /></div>}
         </div>
 
         <header className="flex flex-col gap-2">
-          <h1 className="text-[28px] leading-[34px] font-extrabold break-words">{l.name}</h1>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <h1 id="listing-title" className="text-[28px] leading-[34px] font-extrabold break-words">{l.name}</h1>
+          <div className="flex flex-wrap items-center gap-2">
             <VeganStatusTag status={l.veganStatus} />
-            {l.category && <Tag tone="plain">{l.category}</Tag>}
+            {l.category && <Tag tone="plain" className="category-chip">{l.category}</Tag>}
             <OfferBadge count={l.activeOfferCount} />
             {l.runByOwner && <OwnerBadge />}
             {l.hidden && <Tag tone="plain">Hidden</Tag>}
           </div>
           {where && (
-            <p className="flex items-center gap-1.5 text-base text-muted">
+            <p className="flex items-center gap-2 text-base text-muted">
               {l.kind === 'product' ? <ShoppingBasket size={18} aria-hidden="true" /> : <MapPin size={18} aria-hidden="true" />}
               {where}
             </p>
@@ -116,7 +130,7 @@ export function ListingDetail() {
               href={l.mapsUrl}
               target="_blank"
               rel="noopener noreferrer nofollow ugc"
-              className="inline-flex h-11 w-fit items-center gap-2 text-base font-bold text-brand underline-offset-4 hover:underline"
+              className="inline-flex h-11 w-fit items-center gap-2 text-base font-bold text-ink underline-offset-4 hover:underline"
             >
               <ExternalLink size={18} aria-hidden="true" />
               Open in maps
@@ -130,7 +144,7 @@ export function ListingDetail() {
             <>
               <div className="flex items-center justify-between gap-2">
                 <h2 id="offers-h" className="text-lg font-extrabold">Offers now</h2>
-                <Link to={offerPath} className="inline-flex h-11 items-center gap-1 px-1 text-sm font-bold text-brand">
+                <Link to={offerPath} className="inline-flex h-11 items-center gap-1 px-1 text-sm font-bold text-ink">
                   <Plus size={16} aria-hidden="true" /> Add an offer
                 </Link>
               </div>
@@ -156,7 +170,7 @@ export function ListingDetail() {
               >
                 <TagIcon size={18} aria-hidden="true" className="shrink-0 text-saffron" />
                 <span className="flex-1">Know a deal here?</span>
-                <span className="font-bold text-brand">Add an offer</span>
+                <span className="font-bold text-ink">Add an offer</span>
               </Link>
             </>
           )}

@@ -1,8 +1,14 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig } from '@playwright/test';
 
 // E2E_PORT lets parallel worktrees run the suite side by side.
 const PORT = Number(process.env.E2E_PORT || 4391);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
+
+const MAIL_DIR = process.env.VW_E2E_MAIL_DIR ?? mkdtempSync(join(tmpdir(), 'vw-e2e-mail-'));
+process.env.VW_E2E_MAIL_DIR = MAIL_DIR;
 
 const phone = { browserName: 'chromium' as const, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
 
@@ -14,6 +20,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: ORIGIN,
+    launchOptions: process.env.VW_E2E_BROWSER_PATH ? { executablePath: process.env.VW_E2E_BROWSER_PATH } : undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -36,6 +43,7 @@ export default defineConfig({
       APP_ORIGIN: ORIGIN,
       DATABASE_URL: 'pglite://memory',
       VW_E2E_RELAXED_LIMITS: '1',
+      VW_E2E_MAIL_DIR: MAIL_DIR,
       SERVER_SECRET: 'e2e-only-secret-0123456789abcdef0123456789',
     },
   },

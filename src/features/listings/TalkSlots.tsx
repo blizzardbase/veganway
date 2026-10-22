@@ -29,9 +29,9 @@ const LinkedTopics = slot<LinkedTopicsProps>('../talk/LinkedTopics.tsx', 'Linked
 export function ListingTalk({ listingId, name, slug, kind }: { listingId: string; name: string; slug: string; kind: ListingKind }) {
   if (!Replies && !LinkedTopics) return null;
   return (
-    <Suspense fallback={<Skeleton className="h-24 w-full rounded-card" />}>
+    <div className="listing-talk"><Suspense fallback={<div role="status" aria-label="Loading discussions" className="min-h-[324px]"><Skeleton className="h-11 w-full rounded-card" /></div>}>
       {LinkedTopics && <LinkedTopics listingId={listingId} listingName={name} listingSlug={slug} listingKind={kind} />}
       {Replies && <Replies targetType="listing" targetId={listingId} composer="inline" />}
-    </Suspense>
+    </Suspense></div>
   );
 }

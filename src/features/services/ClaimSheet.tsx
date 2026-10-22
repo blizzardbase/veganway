@@ -34,7 +34,7 @@ export function ClaimSheet({ open, onClose, listingId, slug, name, claim }: {
             icon={<Copy size={18} aria-hidden="true" />}
             onClick={() => {
               void navigator.clipboard?.writeText(pending.code).then(
-                () => toast.show({ message: 'Code copied.' }),
+                () => toast.show({ success: true, message: 'Code copied.' }),
                 () => toast.show({ message: 'Could not copy. Please write the code down.' }),
               );
             }}

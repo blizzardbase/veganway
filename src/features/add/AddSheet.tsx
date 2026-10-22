@@ -41,18 +41,18 @@ export function AddSheetProvider({ children }: { children: ReactNode }) {
     <AddSheetContext.Provider value={api}>
       {children}
       <Sheet open={open} onClose={() => setOpen(false)} title="What would you like to add?">
-        <ul className="grid grid-cols-2 gap-3 pt-1 pb-2">
+        <ul className="stagger-list add-tiles grid grid-cols-2 gap-3 pt-1 pb-2">
           {ADD_TILES.map(({ kind, label, hint, icon: Icon }) => (
-            <li key={kind}>
+            <li key={kind} data-add-kind={kind} data-category={{ place: 'restaurant', product: 'drinks', offer: 'bakery', service: 'desserts', discussion: 'cooking class', poll: 'pantry' }[kind]}>
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
                   navigate(`/add/${kind}`);
                 }}
-                className="flex h-full min-h-24 w-full flex-col items-start gap-2 rounded-card border border-line bg-surface-2 p-4 text-left transition hover:border-brand active:scale-[0.98]"
+                className="add-tile flex h-full min-h-24 w-full flex-col items-start gap-2 rounded-card border border-line bg-surface-2 p-4 text-left transition hover:border-ink active:scale-[0.98]"
               >
-                <Icon size={24} className="text-brand" aria-hidden="true" />
+                <Icon size={24} className="text-ink" aria-hidden="true" />
                 <span className="text-base font-extrabold">{label}</span>
                 <span className="text-xs text-muted">{hint}</span>
               </button>

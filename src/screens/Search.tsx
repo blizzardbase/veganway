@@ -27,7 +27,7 @@ function listingPath(h: ListingHit): string {
 function ListingRow({ hit, q, onOpen }: { hit: ListingHit; q: string; onOpen: () => void }) {
   return (
     <li>
-      <Link to={listingPath(hit)} onClick={onOpen} className="flex gap-3 rounded-card px-2 py-3 hover:bg-surface-2">
+      <Link to={listingPath(hit)} onClick={onOpen} className="search-result flex gap-3 rounded-card px-2 py-3 hover:bg-surface-2">
         {hit.photoUrl
           ? <img src={hit.photoUrl} alt="" loading="lazy" decoding="async" className="size-11 shrink-0 rounded-input bg-surface-2 object-cover" />
           : <Monogram name={hit.name} category={hit.category} kind={hit.kind} size="sm" />}
@@ -82,13 +82,13 @@ function Group({ title, icon: Icon, group, q, seeAll, onOpen, children }: {
   return (
     <section aria-label={title} className="flex flex-col gap-1">
       <div className="flex items-center gap-2 px-2">
-        <Icon size={18} aria-hidden="true" className="text-brand" />
+        <Icon size={18} aria-hidden="true" className="text-ink" />
         <h2 className="flex-1 text-base font-extrabold">{title}</h2>
         <span className="text-sm text-muted">{group.total}</span>
       </div>
-      <ul className="flex flex-col">{children(onOpen, q)}</ul>
+      <ul className="stagger-list flex flex-col">{children(onOpen, q)}</ul>
       {seeAll && group.total > group.items.length && (
-        <Link to={seeAll} className="flex h-11 items-center px-2 text-sm font-bold text-brand">See all {group.total} {title.toLowerCase()}</Link>
+        <Link to={seeAll} className="flex h-11 items-center px-2 text-sm font-bold text-ink">See all {group.total} {title.toLowerCase()}</Link>
       )}
     </section>
   );
@@ -135,7 +135,7 @@ export function Search() {
 
   return (
     <>
-      <div className="sticky top-0 z-30 -mx-4 mb-3 flex items-center gap-1 bg-bg/95 py-2 pr-4 pl-2 backdrop-blur">
+      <div className="page-header sticky top-0 z-30 -mx-4 mb-3 flex items-center gap-1 bg-bg/95 py-2 pr-4 pl-2 backdrop-blur">
         <IconButton label="Back" onClick={() => navigate(-1)}>
           <ChevronLeft size={26} aria-hidden="true" />
         </IconButton>
@@ -165,7 +165,7 @@ export function Search() {
 
       {type && (
         <div className="mb-2 flex items-center gap-2">
-          <Link to={`/search?q=${encodeURIComponent(urlQ)}`} className="flex h-11 items-center gap-1 text-sm font-bold text-brand">
+          <Link to={`/search?q=${encodeURIComponent(urlQ)}`} className="flex h-11 items-center gap-1 text-sm font-bold text-ink">
             <ChevronLeft size={18} aria-hidden="true" /> All results
           </Link>
         </div>
@@ -176,7 +176,7 @@ export function Search() {
           <section aria-label="Recent searches" className="flex flex-col gap-1">
             <div className="flex items-center justify-between px-2">
               <h2 className="text-sm font-bold text-muted">Recent searches</h2>
-              <button type="button" className="h-11 px-2 text-sm font-bold text-brand" onClick={() => { clearRecent(); setRecent([]); }}>Clear</button>
+              <button type="button" className="h-11 px-2 text-sm font-bold text-ink" onClick={() => { clearRecent(); setRecent([]); }}>Clear</button>
             </div>
             <ul className="flex flex-col">
               {recent.map((r) => (
@@ -191,7 +191,7 @@ export function Search() {
             <p className="px-2 pt-2 text-xs text-muted">Recent searches stay on this device only.</p>
           </section>
         ) : (
-          <p className="px-2 pt-6 text-center text-base text-muted">Try tofu, biryani, cake or an area like JLT.</p>
+          <p className="search-hint px-2 pt-6 text-center text-base text-muted">Try tofu, biryani, cake or an area like JLT.</p>
         )
       ) : isPending ? (
         <div role="status" aria-label="Searching" className="flex flex-col gap-3">
@@ -200,9 +200,9 @@ export function Search() {
           <Skeleton className="h-16" />
         </div>
       ) : isError && !data ? (
-        <EmptyState icon={SearchX} line="Search did not work. Please try again." action={{ label: 'Retry', onClick: () => void refetch() }} />
+        <EmptyState artwork="search" icon={SearchX} line="Search did not work. Please try again." action={{ label: 'Retry', onClick: () => void refetch() }} />
       ) : total === 0 ? (
-        <EmptyState icon={SearchX} line={`Nothing found for “${q}”. Add it so others can find it.`} action={{ label: 'Add a place', to: '/add/place' }} />
+        <EmptyState artwork="search" icon={SearchX} line={`Nothing found for “${q}”. Add it so others can find it.`} action={{ label: 'Add a place', to: '/add/place' }} />
       ) : (
         <div className={isFetching ? 'flex flex-col gap-5 opacity-70 transition-opacity' : 'flex flex-col gap-5'} aria-busy={isFetching}>
           {visible.map((g) => {

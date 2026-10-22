@@ -2,6 +2,7 @@
 import type { Db } from './db.js';
 import type { Keys, PasswordHasher } from './lib/crypto.js';
 import type { Limits } from './lib/rate.js';
+import type { Mailer } from './lib/mailer.js';
 import type { MediaStore } from './lib/media.js';
 
 export interface AppConfig {
@@ -19,6 +20,7 @@ export interface Deps {
   passwords: PasswordHasher;
   limits: Limits;
   media: MediaStore;
+  mailer: Mailer;
 }
 
 export interface AppOptions {
@@ -26,6 +28,7 @@ export interface AppOptions {
   serverSecret: string;
   appOrigin: string;
   media: MediaStore;
+  mailer: Mailer;
   /** Express "trust proxy" setting. Vercel: 1. Local: false. */
   trustProxy?: boolean | number;
   /** Tests inject a counting wrapper here. Defaults to scrypt. */

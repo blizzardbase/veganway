@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ArrowDownUp, ChefHat, ChevronDown, SearchX, ShoppingBasket, Store, Tag as TagIcon } from 'lucide-react';
-import { Button, Chip, ChipRow, EmptyState, ListSkeleton, SearchPill, Segmented, Sheet } from '../ui';
+import { Button, Chip, ChipRow, EmptyState, ListSkeleton, SearchPill, Segmented, TopBar, Sheet } from '../ui';
 import { ListingCard } from '../features/listings/ListingCard';
 import { AreaSheet } from '../features/listings/AreaSheet';
 import { flatUnique, useListings, type ListingFilters } from '../features/listings/api';
@@ -84,10 +84,8 @@ export function Explore() {
 
   return (
     <>
-      <header className="flex h-14 items-center">
-        <h1 className="text-xl font-extrabold">Explore</h1>
-      </header>
-      <div className="sticky top-0 z-30 -mx-4 flex flex-col gap-2 bg-bg/95 px-4 pt-2 pb-2 backdrop-blur">
+      <TopBar title="Explore" />
+      <div className="sticky top-14 z-30 -mx-4 flex flex-col gap-2 bg-bg/95 px-4 pt-2 pb-2 backdrop-blur">
         <SearchPill />
         <Segmented<ListingKind> label="Show" options={SEGMENTS} value={filters.kind} onChange={setKind} />
         <ChipRow label="Filters">
@@ -114,7 +112,7 @@ export function Explore() {
               </Chip>
             </>
           )}
-          <Chip selected={Boolean(filters.category)} onClick={() => setPicker('category')} icon={<ChevronDown size={16} aria-hidden="true" />}>
+          <Chip data-category={filters.category?.toLowerCase()} className="category-filter" selected={Boolean(filters.category)} onClick={() => setPicker('category')} icon={<ChevronDown size={16} aria-hidden="true" />}>
             {filters.category ?? 'Category'}
           </Chip>
           {filters.kind !== 'service' && (
@@ -132,11 +130,11 @@ export function Explore() {
           <EmptyState icon={SearchX} line={errorMessage(query.error)} action={{ label: 'Try again', onClick: () => void query.refetch() }} />
         ) : items.length === 0 ? (
           filtered
-            ? <EmptyState icon={SearchX} line="Nothing matches these filters yet." action={{ label: 'Clear filters', onClick: () => setKind(filters.kind) }} />
+            ? <EmptyState artwork="search" icon={SearchX} line="Nothing matches these filters yet." action={{ label: 'Clear filters', onClick: () => setKind(filters.kind) }} />
             : <EmptyState icon={empty.icon} line={empty.line} action={{ label: empty.label, to: empty.to }} />
         ) : (
           <>
-            <ul className="flex flex-col gap-3">
+            <ul className="stagger-list flex flex-col gap-3">
               {items.map((l) => (
                 <li key={l.id}><ListingCard listing={l} /></li>
               ))}
@@ -165,7 +163,7 @@ export function Explore() {
                   update({ sort: s === 'top' ? null : s });
                   setPicker(null);
                 }}
-                className="flex h-12 items-center justify-between rounded-input border border-line bg-surface px-4 text-left text-base font-semibold aria-checked:border-brand aria-checked:bg-brand-soft aria-checked:text-brand"
+                className="flex h-12 items-center justify-between rounded-input border border-line bg-surface px-4 text-left text-base font-semibold aria-checked:border-ink aria-checked:bg-surface-2 aria-checked:text-ink"
               >
                 {SORT_LABEL[s]}
               </button>

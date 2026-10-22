@@ -8,7 +8,7 @@ export function SavedList() {
   const q = useBookmarks();
   const items = flatUnique(q.data?.pages);
   if (q.isPending) return <ListSkeleton count={2} label="Loading saved" />;
-  if (items.length === 0 && !q.isError) return <InlineEmpty icon={Bookmark} line="Nothing saved yet. Tap Save on a place to keep it here." action={{ label: 'Explore', to: '/explore' }} />;
+  if (items.length === 0 && !q.isError) return <InlineEmpty artwork="saved" icon={Bookmark} line="Nothing saved yet. Tap Save on a place to keep it here." action={{ label: 'Explore', to: '/explore' }} />;
   return (
     <div className="flex flex-col gap-3">
       {q.isError && (

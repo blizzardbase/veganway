@@ -28,7 +28,7 @@ export function LinkedTopics(props: LinkedTopicsProps) {
   return (
     <section aria-labelledby={`linked-${props.listingId}`} className="flex flex-col gap-3">
       <h2 id={`linked-${props.listingId}`} className="text-lg font-extrabold">Discussions</h2>
-      {isPending && <Skeleton className="h-16 w-full rounded-card" />}
+      {isPending && <div role="status" aria-label="Loading linked discussions"><Skeleton className="h-11 w-full rounded-card" /></div>}
       {data && data.items.length === 0 && (
         <InlineEmpty icon={MessagesSquare} line="No discussions about this yet." />
       )}

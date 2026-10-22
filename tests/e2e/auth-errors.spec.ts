@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { AccountWithCodeResponse } from '../../shared/types';
+import type { AuthResponse } from '../../shared/types';
 import type { ServiceCreated } from '../../shared/types/services';
 
 async function member(page: Page, origin: string) {
@@ -8,7 +8,7 @@ async function member(page: Page, origin: string) {
     data: { email: `auth.errors.${crypto.randomUUID()}@example.test`, password: 'synthetic browser password' },
   });
   expect(res.status()).toBe(201);
-  const account: AccountWithCodeResponse = await res.json();
+  const account: AuthResponse = await res.json();
   return account;
 }
 
@@ -65,6 +65,8 @@ test('UX-07: cached Me content stays visible when refresh fails and Retry recove
   }
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Explore', exact: true }).click();
   await expect(page).toHaveURL(/\/explore$/);
+  // Let the tab transition commit before advancing the query freshness clock.
+  await expect(page.getByRole('heading', { name: 'Explore', exact: true })).toBeVisible();
   let failing = true;
   for (const { path } of sections) {
     await page.route(`**${path}`, (route) => failing

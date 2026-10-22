@@ -15,6 +15,7 @@ function guard(page: Page, origin: string) {
 }
 
 async function expectNoSeriousA11yIssues(page: Page, where: string) {
+  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
   const results = await new AxeBuilder({ page }).analyze();
   const serious = results.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
@@ -27,13 +28,13 @@ async function expectNoSideScroll(page: Page, where: string) {
   expect(overflow, `horizontal overflow on ${where}`).toBeLessThanOrEqual(0);
 }
 
-test('sign up, pass the recovery gate, reach Home with five tabs', async ({ page, baseURL }, testInfo) => {
+test('sign up without a recovery code and reach Home with five tabs', async ({ page, baseURL }, testInfo) => {
   const problems = guard(page, new URL(baseURL!).origin);
   const email = `e2e.${testInfo.project.name}.${Date.now()}@example.test`;
 
   await page.goto('/');
   await expect(page).toHaveURL(/\/welcome$/);
-  await expect(page.getByText('No phone number. Any email works, even a burner. We never send email and never track you.')).toBeVisible();
+  await expect(page.getByText('No phone number. We never store your email. We only email password reset links and never track you.')).toBeVisible();
   await expectNoSeriousA11yIssues(page, 'Welcome');
   await expectNoSideScroll(page, 'Welcome');
 
@@ -53,28 +54,7 @@ test('sign up, pass the recovery gate, reach Home with five tabs', async ({ page
   await expect(name).not.toHaveText(first);
   await page.getByRole('button', { name: 'Keep this name' }).click();
 
-  // Recovery code gate.
-  await expect(page).toHaveURL(/\/join\/recovery$/);
-  await expect(page.getByTestId('recovery-email')).toHaveText(email);
-  const code = ((await page.getByTestId('recovery-code').textContent()) ?? '').trim();
-  expect(code.replace(/-/g, '')).toMatch(/^[0-9A-HJKMNP-TV-Z]{20}$/);
-  const last4 = code.replace(/-/g, '').slice(-4);
-  const wrong4 = last4.split('').map((c) => (c === '0' ? '1' : '0')).join('');
-
-  const cont = page.getByRole('button', { name: 'Continue' });
-  await expect(cont).toBeDisabled();
-  await page.getByLabel('Type the last 4 characters').fill(last4);
-  await expect(cont, 'typed code alone does not unlock').toBeDisabled();
-  await page.getByLabel('Type the last 4 characters').fill('');
-  await page.getByLabel('I saved my recovery code').check();
-  await expect(cont, 'tick alone does not unlock').toBeDisabled();
-  await page.getByLabel('Type the last 4 characters').fill(wrong4);
-  await expect(cont, 'wrong characters do not unlock').toBeDisabled();
-  await page.getByLabel('Type the last 4 characters').fill(last4.toLowerCase());
-  await expect(cont).toBeEnabled();
-  await expectNoSeriousA11yIssues(page, 'Recovery');
-  await expectNoSideScroll(page, 'Recovery');
-  await cont.click();
+  await expect(page.getByText(/recovery code/i)).toHaveCount(0);
 
   // Service question, then Home.
   await expect(page).toHaveURL(/\/join\/service$/);

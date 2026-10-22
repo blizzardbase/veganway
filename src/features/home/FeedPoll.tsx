@@ -1,6 +1,6 @@
 // A poll inside a feed card. Same rule and labels as Talk's PollBlock: tap to vote, bars after voting
 // or after close. Votes go to the Talk API; the feed and Talk caches both update.
-import { m } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { Check } from 'lucide-react';
 import type { Poll } from '../../../shared/types/talk';
 import { errorMessage } from '../../api/client';
@@ -11,6 +11,7 @@ import { closesIn, plural } from '../talk/format';
 import { useFeedVote } from './api';
 
 export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
+  const still = useReducedMotion();
   const vote = useFeedVote(topicId);
   const toast = useToast();
   const requireAccount = useRequireAccount();
@@ -23,7 +24,7 @@ export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
     requireAccount(() => {
       const previous = poll.myVote;
       vote.mutate(optionId, {
-        onSuccess: () => toast.show({
+        onSuccess: () => toast.show({ success: true,
           message: previous ? 'Vote changed' : 'Vote saved',
           onUndo: () => vote.mutate(previous, { onError: (err) => toast.show({ message: errorMessage(err) }) }),
         }),
@@ -34,7 +35,7 @@ export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-1.5" aria-label="Poll options">
+      <ul className="flex flex-col gap-2" aria-label="Poll options">
         {poll.options.map((o) => {
           const mine = poll.myVote === o.id;
           const pct = showResults && total ? Math.round(((o.votes ?? 0) / total) * 100) : 0;
@@ -48,8 +49,8 @@ export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
                 aria-label={showResults ? `${o.label}, ${pct} percent${mine ? ', your vote' : ''}` : `Vote for ${o.label}`}
                 className={cx(
                   'relative flex min-h-11 w-full items-center gap-2 overflow-hidden rounded-input border px-3 text-left text-sm transition',
-                  mine ? 'border-brand' : 'border-line',
-                  open && !mine && 'hover:border-brand active:scale-[0.99] active:border-brand active:bg-brand-soft',
+                  mine ? 'border-ink' : 'border-line',
+                  open && !mine && 'hover:border-ink active:scale-[0.99] active:border-ink active:bg-cool-soft',
                   !open && 'disabled:opacity-100',
                   showResults ? 'bg-surface' : 'cursor-pointer bg-surface font-semibold shadow-1',
                 )}
@@ -61,14 +62,14 @@ export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
                 {showResults && (
                   <m.span
                     aria-hidden="true"
-                    className={cx('absolute inset-y-0 left-0 w-full origin-left', mine ? 'bg-brand-soft' : 'bg-surface-2')}
-                    initial={{ scaleX: 0 }}
+                    className={cx('absolute inset-y-0 left-0 w-full origin-left', mine ? 'bg-cool-soft' : 'bg-surface-2')}
+                    initial={still ? false : { scaleX: 0 }}
                     animate={{ scaleX: pct / 100 }}
                     transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
                   />
                 )}
                 <span className="relative min-w-0 flex-1 py-2 break-words">{o.label}</span>
-                {mine && <Check size={18} className="relative shrink-0 text-brand" aria-hidden="true" />}
+                {mine && <Check size={18} className="relative shrink-0 text-cool" aria-hidden="true" />}
                 {showResults && <span className="relative shrink-0 font-extrabold tabular-nums">{pct}%</span>}
               </button>
             </li>
@@ -86,7 +87,7 @@ export function FeedPoll({ topicId, poll }: { topicId: string; poll: Poll }) {
         {poll.myVote ? (
           <>
             <span aria-hidden="true">·</span>
-            <span className="font-bold text-brand">You voted</span>
+            <span className="font-bold text-cool">You voted</span>
           </>
         ) : open && (
           <>

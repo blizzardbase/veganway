@@ -62,7 +62,7 @@ export function ListingPicker({ value, onPick, error }: {
 
   if (value) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <p className="text-sm font-bold text-ink">Where is the offer?</p>
         <div className="flex items-center gap-2 rounded-input border border-brand bg-brand-soft py-1 pr-1 pl-4">
           <Check size={18} aria-hidden="true" className="text-brand" />

@@ -37,7 +37,7 @@ export function ReportSheet({ open, onClose, targetType, targetId, what = 'this'
     }
     try {
       await report.mutateAsync({ targetType, targetId, reason, note: note.trim() || undefined });
-      toast.show({ message: 'Thanks. An admin will take a look.' });
+      toast.show({ success: true, message: 'Thanks. An admin will take a look.' });
       close();
     } catch (err) {
       setError(errorMessage(err));
@@ -54,10 +54,10 @@ export function ReportSheet({ open, onClose, targetType, targetId, what = 'this'
               key={r}
               className={cx(
                 'flex min-h-12 cursor-pointer items-center gap-3 rounded-input border px-4 text-base',
-                reason === r ? 'border-brand bg-brand-soft' : 'border-line bg-surface',
+                reason === r ? 'border-ink bg-surface-2' : 'border-line bg-surface',
               )}
             >
-              <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="size-5 accent-brand" />
+              <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="size-5 accent-ink" />
               {REPORT_REASON_LABELS[r]}
             </label>
           ))}

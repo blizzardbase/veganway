@@ -2,7 +2,7 @@ import { cx } from '../lib/cx';
 
 /** A grey placeholder block. Use card shaped skeletons, never a spinner, while lists load. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cx('animate-pulse rounded-input bg-surface-2', className)} />;
+  return <div aria-hidden="true" className={cx('skeleton-shimmer rounded-input bg-surface-2', className)} />;
 }
 
 /** The skeleton for one listing card row. */

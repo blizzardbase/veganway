@@ -14,7 +14,7 @@ import { ListSkeleton } from './ui/Skeleton';
 import { Home } from './screens/Home';
 import { Welcome } from './screens/Welcome';
 import { Join } from './screens/Join';
-import { Recovery } from './screens/Recovery';
+import { ForgotPassword } from './screens/ForgotPassword';
 import { ServiceQuestion } from './screens/ServiceQuestion';
 import { SignIn } from './screens/SignIn';
 import { Reset } from './screens/Reset';
@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
         children: [
           { path: 'welcome', element: <Welcome /> },
           { path: 'join', element: <Join /> },
-          { path: 'join/recovery', element: <Recovery /> },
+          { path: 'forgot-password', element: <ForgotPassword /> },
           { path: 'join/service', element: <ServiceQuestion /> },
           { path: 'signin', element: <SignIn /> },
           { path: 'reset', element: <Reset /> },

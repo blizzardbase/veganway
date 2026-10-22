@@ -187,16 +187,17 @@ export function router(deps: Deps): Router {
     const me = currentUser(res);
     const body = parse(deleteBody, req.body);
     await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<{ pw_hash: string; recovery_hash: string }>('SELECT pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
+    const row = await db.one<{ pw_hash: string }>('SELECT pw_hash FROM users WHERE id = $1', [me.id]);
     if (!(await passwords.verify(body.password, row.pw_hash))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
     const blobPaths = await db.tx(async (q) => {
       const current = await q.maybeOne(
-        `SELECT id FROM users WHERE id = $1 AND pw_hash = $2 AND recovery_hash = $3
+        `SELECT id FROM users WHERE id = $1 AND pw_hash = $2
          AND banned_at IS NULL AND deleted_at IS NULL AND NOT is_system FOR UPDATE`,
-        [me.id, row.pw_hash, row.recovery_hash],
+        [me.id, row.pw_hash],
       );
       if (!current) fail(401, 'Your credentials changed. Please sign in again.', 'bad_credentials');
       await q.query('DELETE FROM sessions WHERE user_id = $1', [me.id]);
+      await q.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [me.id]);
       // The avatar goes, and so does every photo they uploaded that no visible listing or
       // recommendation still shows. Photos on posts that stay keep showing under "Former member".
       const { avatar_photo_id: avatarId } = await q.one<{ avatar_photo_id: string | null }>('SELECT avatar_photo_id FROM users WHERE id = $1', [me.id]);
@@ -210,7 +211,7 @@ export function router(deps: Deps): Router {
         [me.id, avatarId],
       );
       await q.query(
-        `UPDATE users SET email_hmac = NULL, pw_hash = NULL, recovery_hash = NULL, pseudonym = $2,
+        `UPDATE users SET email_hmac = NULL, pw_hash = NULL, pseudonym = $2,
            display_name = NULL, bio = NULL, avatar_photo_id = NULL, has_service = false, role = 'member',
            theme = 'system', profile_hidden = false, deleted_at = now()
          WHERE id = $1`,

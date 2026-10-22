@@ -73,7 +73,7 @@ export default function AddServiceForm() {
           {errors.area && <p role="alert" className="mt-1 text-sm font-semibold text-danger">{errors.area}</p>}
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <span className="text-sm font-bold">Photo (optional)</span>
           <PhotoPicker value={photo} onChange={setPhoto} onBusy={setUploading} />
         </div>

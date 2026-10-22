@@ -13,7 +13,7 @@ const INPUT = 'h-12 w-full rounded-input border bg-surface px-4 text-base text-i
 /** Remove chip for a chosen tag or listing. */
 function Picked({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <li className="inline-flex h-11 min-w-0 max-w-full items-center gap-1 rounded-full bg-brand-soft pr-0 pl-4 text-sm font-bold text-brand">
+    <li className="inline-flex h-11 min-w-0 max-w-full items-center gap-1 rounded-full bg-cool-soft pr-0 pl-4 text-sm font-bold text-cool">
       <span className="min-w-0 max-w-[16rem] truncate" title={label}>{label}</span>
       <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-surface">
         <X size={16} aria-hidden="true" />
@@ -47,7 +47,7 @@ export function TagInput({ value, onChange, error }: { value: string[]; onChange
   const suggestions = (popular.data ?? []).filter((t) => !value.includes(t)).slice(0, 8);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-sm font-bold text-ink">Tags <span className="font-semibold text-muted">(optional, up to {TOPIC_TAGS_MAX})</span></label>
       {value.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Chosen tags">
@@ -73,7 +73,7 @@ export function TagInput({ value, onChange, error }: { value: string[]; onChange
           onClick={() => add(text)}
           disabled={!text.trim() || full}
           aria-label="Add tag"
-          className="inline-flex size-12 shrink-0 items-center justify-center rounded-input border border-line bg-surface text-brand disabled:opacity-40"
+          className="inline-flex size-12 shrink-0 items-center justify-center rounded-input border border-line bg-surface text-cool disabled:opacity-40"
         >
           <Plus size={20} aria-hidden="true" />
         </button>
@@ -126,7 +126,7 @@ export function ListingPicker({ value, onChange, error }: { value: LinkedListing
   const options = (results.data ?? []).filter((s) => !value.some((v) => v.id === s.id));
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-sm font-bold text-ink">
         Link places, products or services <span className="font-semibold text-muted">(optional, up to {TOPIC_LISTINGS_MAX})</span>
       </label>

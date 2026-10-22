@@ -5,7 +5,6 @@ import { Shuffle, VenetianMask } from 'lucide-react';
 import { Button, Field, TopBar } from '../ui';
 import { ApiError, errorMessage } from '../api/client';
 import { useConfirmPseudonym, useMe, useShuffle, useSignUp } from '../api/session';
-import { holdRecovery, peekRecovery } from '../features/auth/recoveryStore';
 import { safeNext } from '../features/auth/Gate';
 import { PASSWORD_MIN } from '../../shared/types';
 
@@ -52,7 +51,7 @@ function NameReveal({ name }: { name: string }) {
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-            className="text-center text-2xl font-extrabold text-brand"
+            className="text-center text-2xl font-extrabold text-ink"
           >
             {name}
           </m.p>
@@ -87,8 +86,8 @@ export function Join() {
     setErrors(local);
     if (local.email || local.password) return;
     try {
-      const res = await signUp.mutateAsync({ email, password });
-      holdRecovery({ code: res.recoveryCode, email: email.trim(), next, reason: 'signup' });
+      await signUp.mutateAsync({ email, password });
+      setEmail('');
       setPassword('');
     } catch (err) {
       if (err instanceof ApiError && (err.field === 'email' || err.field === 'password')) setErrors({ [err.field]: err.message });
@@ -99,8 +98,7 @@ export function Join() {
   const onKeep = async () => {
     try {
       await confirm.mutateAsync();
-      const pending = peekRecovery();
-      navigate('/join/recovery', { replace: true, state: { next: pending?.next ?? next } });
+      navigate(next, { replace: true });
     } catch (err) {
       setErrors({ form: errorMessage(err) });
     }
@@ -109,16 +107,16 @@ export function Join() {
   if (revealing && user) {
     return (
       <div className="flex flex-1 flex-col pt-6">
-        <p className="text-sm font-bold text-brand">Step 2 of 3</p>
+        <p className="text-sm font-bold text-ink">Step 2 of 2</p>
         <h1 className="mt-1 text-2xl font-extrabold">Meet your community name</h1>
         <p className="mt-2 text-base text-muted">
           Members see this name, never your email. You can add a display name later in Me.
         </p>
-        <div className="mt-8 flex flex-col items-center gap-4 rounded-card border border-line bg-gradient-to-b from-brand-soft to-surface p-6 shadow-1">
+        <div className="mt-8 flex flex-col items-center gap-4 rounded-card border border-line bg-gradient-to-b from-surface-2 to-surface p-6 shadow-1">
           <NameReveal name={user.pseudonym} />
           {/* The mask sits centred above the centred line, so the block reads as one shape. */}
           <p className="flex max-w-[30ch] flex-col items-center gap-1 text-center text-sm text-muted">
-            <VenetianMask size={20} aria-hidden="true" className="shrink-0 text-brand" />
+            <VenetianMask size={20} aria-hidden="true" className="shrink-0 text-ink" />
             <span>This name keeps you anonymous. You can change how you show up later in Me.</span>
           </p>
           <Button
@@ -142,7 +140,7 @@ export function Join() {
   return (
     <div className="flex flex-1 flex-col">
       <TopBar back="/welcome" />
-      <p className="text-sm font-bold text-brand">Step 1 of 3</p>
+      <p className="text-sm font-bold text-ink">Step 1 of 2</p>
       <h1 className="mt-1 text-2xl font-extrabold">Join VeganWay</h1>
       <p className="mt-2 text-base text-muted">No phone number and no real name. Just an email and a password.</p>
       <form className="mt-6 flex flex-1 flex-col gap-5" onSubmit={onSubmit} noValidate>
@@ -157,7 +155,7 @@ export function Join() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
-          hint="Any email works, even a burner. We never send email."
+          hint="Use an email you can open. We only use it to send you a reset link, and we never store it."
           required
         />
         <Field
@@ -177,7 +175,7 @@ export function Join() {
           <Button type="submit" block busy={signUp.isPending} busyLabel="Creating your account">Continue</Button>
           <p className="text-center text-sm text-muted">
             Already a member?{' '}
-            <Link to={`/signin${params.get('next') ? `?next=${encodeURIComponent(params.get('next') ?? '')}` : ''}`} className="inline-flex min-h-11 items-center font-bold text-brand">
+            <Link to={`/signin${params.get('next') ? `?next=${encodeURIComponent(params.get('next') ?? '')}` : ''}`} className="inline-flex min-h-11 items-center font-bold text-ink">
               Sign in
             </Link>
           </p>

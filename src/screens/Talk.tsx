@@ -60,7 +60,7 @@ export function Talk() {
             : <EmptyState icon={MessagesSquare} line="No discussions yet. Start the first one." action={{ label: 'Start a discussion', to: '/add/discussion' }} />
         )}
         {items.length > 0 && (
-          <ul className="flex flex-col gap-3" aria-label="Discussions">
+          <ul className="stagger-list flex flex-col gap-3" aria-label="Discussions">
             {items.map((t) => <li key={t.id}><TopicRow topic={t} /></li>)}
           </ul>
         )}

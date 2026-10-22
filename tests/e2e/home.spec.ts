@@ -97,11 +97,6 @@ async function join(page: Page, email: string) {
   await page.getByLabel('Password').fill('a long password here');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Keep this name' }).click();
-  await expect(page).toHaveURL(/\/join\/recovery$/);
-  const code = ((await page.getByTestId('recovery-code').textContent()) ?? '').trim().replace(/-/g, '');
-  await page.getByLabel('I saved my recovery code').check();
-  await page.getByLabel('Type the last 4 characters').fill(code.slice(-4));
-  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page).toHaveURL(/\/join\/service$/);
   await page.getByRole('link', { name: 'Later' }).click();
   await expect(page).toHaveURL(/\/$/);

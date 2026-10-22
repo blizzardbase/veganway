@@ -9,14 +9,13 @@ import { audit } from '../lib/audit.js';
 import {
   clearSessionCookie, createSession, currentUser, loadUser, requireUser, setSessionCookie, toMe, toSessionUser, USER_COLUMNS,
 } from '../lib/auth.js';
-import {
-  emailHmac, formatRecoveryCode, ipKey, isRecoveryCodeShape, newRecoveryCode, normalizeRecoveryCode,
-  randomToken, recoveryHash, safeEqualHex, hmac,
-} from '../lib/crypto.js';
+import { emailHmac, ipKey, normalizeEmail, randomToken, sha256 } from '../lib/crypto.js';
+import { setTimeout as delay } from 'node:timers/promises';
+import { resetMail } from '../lib/mailer.js';
 import { fail, parse } from '../lib/http.js';
 import { availablePseudonym } from '../lib/pseudonym.js';
 import { check, limit } from '../lib/rate.js';
-import { PASSWORD_MAX, PASSWORD_MIN, type AccountWithCodeResponse, type AuthResponse, type MeResponse, type RecoveryCodeResponse } from '../../shared/types.js';
+import { PASSWORD_MAX, PASSWORD_MIN, type AuthResponse, type MeResponse } from '../../shared/types.js';
 
 const email = z.string({ error: 'Enter your email address.' }).trim().min(3, { error: 'Enter your email address.' })
   .max(254, { error: 'That email address is too long.' })
@@ -26,24 +25,27 @@ const newPassword = z.string({ error: 'Choose a password.' })
   .max(PASSWORD_MAX, { error: `Use at most ${PASSWORD_MAX} characters.` });
 const anyPassword = z.string({ error: 'Enter your password.' }).min(1, { error: 'Enter your password.' })
   .max(PASSWORD_MAX, { error: 'Email or password is wrong.' });
-const recoveryCode = z.string({ error: 'Enter your recovery code.' }).max(64, { error: 'That recovery code is not valid.' });
+const token = z.string().regex(/^[A-Za-z0-9_-]{43}$/, { error: 'That reset link is not valid. Request a new link.' });
 
 const signupBody = z.object({ email, password: newPassword });
 const loginBody = z.object({ email, password: anyPassword });
-const resetBody = z.object({ email, recoveryCode, newPassword });
+const forgotBody = z.object({ email });
+const resetBody = z.object({ token, newPassword });
 const changeBody = z.object({ currentPassword: anyPassword, newPassword });
-const passwordOnly = z.object({ password: anyPassword });
+
+const RESET_RESPONSE_MS = 5500;
+const RESET_DELIVERY_MS = 5000;
 
 const clientIp = (req: Request) => req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
-interface Credentials { id: string; pw_hash: string; recovery_hash: string }
+interface Credentials { id: string; pw_hash: string }
 
 // Hold the account lock until the session or credential write commits. Scrypt stays outside it.
 async function credentialsCurrent(q: Queryable, row: Credentials): Promise<boolean> {
   return Boolean(await q.maybeOne(
-    `SELECT id FROM users WHERE id = $1 AND pw_hash = $2 AND recovery_hash = $3
+    `SELECT id FROM users WHERE id = $1 AND pw_hash = $2
      AND banned_at IS NULL AND deleted_at IS NULL AND NOT is_system FOR UPDATE`,
-    [row.id, row.pw_hash, row.recovery_hash],
+    [row.id, row.pw_hash],
   ));
 }
 
@@ -70,17 +72,16 @@ export function router(deps: Deps): Router {
     await check(db, 'signup:global', limits.signupGlobal);
     const emailH = emailHmac(keys, body.email);
     if (await db.maybeOne('SELECT 1 FROM users WHERE email_hmac = $1', [emailH])) {
-      fail(409, 'An account already uses this email. Sign in, or reset your password with your recovery code.', 'email_taken', 'email');
+      fail(409, 'An account already uses this email. Sign in, or request a password reset link.', 'email_taken', 'email');
     }
     const pwHash = await passwords.hash(body.password);
-    const code = newRecoveryCode();
     for (let attempt = 0; attempt < 3; attempt++) {
       const pseudonym = await availablePseudonym(db);
       try {
         const out = await db.tx(async (q) => {
           const row = await q.one<{ id: string }>(
-            'INSERT INTO users (email_hmac, pw_hash, recovery_hash, pseudonym) VALUES ($1, $2, $3, $4) RETURNING id',
-            [emailH, pwHash, recoveryHash(keys, code), pseudonym],
+            'INSERT INTO users (email_hmac, pw_hash, pseudonym) VALUES ($1, $2, $3) RETURNING id',
+            [emailH, pwHash, pseudonym],
           );
           // The atomic counter also enforces capacity here. A full cap rolls back the insert.
           await limit(q, 'signup:global', limits.signupGlobal);
@@ -89,7 +90,7 @@ export function router(deps: Deps): Router {
           return { user: toSessionUser(user), ...session };
         });
         setSessionCookie(deps, res, out.token);
-        const response: AccountWithCodeResponse = { user: toMe(out.user), csrf: out.csrf, recoveryCode: formatRecoveryCode(code) };
+        const response: AuthResponse = { user: toMe(out.user), csrf: out.csrf };
         res.status(201).json(response);
         return;
       } catch (err) {
@@ -107,7 +108,7 @@ export function router(deps: Deps): Router {
     await limit(db, `login:email:${emailH}`, limits.loginEmail);
     await limit(db, `login:ip:${ipKey(keys, clientIp(req))}`, limits.loginIp);
     const row = await db.maybeOne<Credentials & { banned_at: Date | null }>(
-      'SELECT id, pw_hash, recovery_hash, banned_at FROM users WHERE email_hmac = $1 AND deleted_at IS NULL AND NOT is_system',
+      'SELECT id, pw_hash, banned_at FROM users WHERE email_hmac = $1 AND deleted_at IS NULL AND NOT is_system',
       [emailH],
     );
     const ok = await passwords.verify(body.password, row?.pw_hash ?? (await dummy()));
@@ -132,41 +133,82 @@ export function router(deps: Deps): Router {
     res.json({ ok: true });
   });
 
-  // Reset = email + recovery code + new password. No email is ever sent.
+  r.post('/auth/forgot-password', async (req, res) => {
+    const body = parse(forgotBody, req.body);
+    const emailH = emailHmac(keys, body.email);
+    await limit(db, `reset:ip:${ipKey(keys, clientIp(req))}`, limits.resetIp);
+    await limit(db, `reset:email:${emailH}`, limits.resetEmail);
+    if (!deps.mailer.configured) {
+      console.error('password_reset_mailer_unconfigured');
+      fail(503, 'Password reset is not available right now. Try again later.', 'reset_unavailable');
+    }
+    // Both account cases run the same statements, generate a token, and share a response deadline.
+    // Delivery has a shorter deadline so provider latency or failure cannot reveal membership.
+    const started = performance.now();
+    const raw = randomToken(32);
+    try {
+      const userId = await db.tx(async (q) => {
+        const user = await q.maybeOne<{ id: string }>(
+          `SELECT id FROM users WHERE email_hmac = $1 AND banned_at IS NULL
+           AND deleted_at IS NULL AND NOT is_system FOR UPDATE`, [emailH],
+        );
+        const id = user?.id ?? '00000000-0000-0000-0000-000000000000';
+        await q.query('DELETE FROM password_reset_tokens WHERE expires_at < now()');
+        await q.query('UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [id]);
+        await q.query(
+          `INSERT INTO password_reset_tokens (token_hash, user_id)
+           SELECT $1, id FROM users WHERE id = $2 AND banned_at IS NULL AND deleted_at IS NULL AND NOT is_system`,
+          [sha256(raw), id],
+        );
+        return user?.id;
+      });
+      if (userId) {
+        const link = new URL('/reset', deps.config.origin);
+        // The fragment never reaches the server, so the token stays out of request logs.
+        link.hash = new URLSearchParams({ token: raw }).toString();
+        const remaining = Math.max(1, Math.floor(RESET_DELIVERY_MS - (performance.now() - started)));
+        const signal = AbortSignal.timeout(remaining);
+        // Race as well as abort: a broken adapter must not extend the public response deadline.
+        await Promise.race([
+          deps.mailer.send(resetMail(normalizeEmail(body.email), link.href), signal),
+          delay(remaining, undefined, { signal }).then(() => { throw new Error('ResetMailTimeout'); }),
+        ]);
+      }
+    } catch {
+      console.error('password_reset_delivery_failed');
+    } finally {
+      await delay(Math.max(0, RESET_RESPONSE_MS - (performance.now() - started)));
+    }
+    res.json({ message: 'If an account uses this email, we have sent a reset link. It works for 30 minutes.' });
+  });
+
   r.post('/auth/reset', async (req, res) => {
     const body = parse(resetBody, req.body);
-    const emailH = emailHmac(keys, body.email);
-    await limit(db, `reset:email:${emailH}`, limits.resetEmail);
-    await limit(db, `reset:ip:${ipKey(keys, clientIp(req))}`, limits.resetIp);
-    const code = normalizeRecoveryCode(body.recoveryCode);
-    const row = await db.maybeOne<{ id: string; recovery_hash: string; banned_at: Date | null }>(
-      'SELECT id, recovery_hash, banned_at FROM users WHERE email_hmac = $1 AND deleted_at IS NULL AND NOT is_system',
-      [emailH],
+    await limit(db, `reset-token:ip:${ipKey(keys, clientIp(req))}`, limits.resetIp);
+    const hash = sha256(body.token);
+    const candidate = await db.maybeOne<Credentials>(
+      `SELECT u.id, u.pw_hash FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
+       WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now()
+       AND u.banned_at IS NULL AND u.deleted_at IS NULL AND NOT u.is_system`, [hash],
     );
-    // Hash the new password before deciding, so a wrong email and a wrong code take the same time.
+    if (!candidate) fail(401, 'That reset link is invalid or has expired. Request a new link.', 'bad_reset');
     const pwHash = await passwords.hash(body.newPassword);
-    const given = recoveryHash(keys, code);
-    const matches = isRecoveryCodeShape(code) && safeEqualHex(given, row?.recovery_hash ?? hmac(keys.recovery, randomToken(8)));
-    if (!row || !matches) fail(401, 'Email or recovery code is wrong.', 'bad_recovery');
-    if (row.banned_at) fail(403, 'This account is suspended.', 'banned');
-    const next = newRecoveryCode();
-    const out = await db.tx(async (q) => {
-      // Consume the code atomically: a second reset with the same code finds no row.
-      const updated = await q.maybeOne<{ id: string }>(
-        'UPDATE users SET pw_hash = $1, recovery_hash = $2 WHERE id = $3 AND recovery_hash = $4 RETURNING id',
-        [pwHash, recoveryHash(keys, next), row.id, given],
+    await db.tx(async (q) => {
+      if (!(await credentialsCurrent(q, candidate))) fail(401, 'That reset link is invalid or has expired. Request a new link.', 'bad_reset');
+      // Lock the account first, then recheck token use and expiry after any competing writer.
+      const consumed = await q.maybeOne(
+        `UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = $1
+         AND user_id = $2 AND used_at IS NULL AND expires_at > clock_timestamp() RETURNING user_id`,
+        [hash, candidate.id],
       );
-      if (!updated) fail(401, 'Email or recovery code is wrong.', 'bad_recovery');
-      await q.query('DELETE FROM sessions WHERE user_id = $1', [row.id]);
-      await audit(q, { actorId: row.id, action: 'auth.reset', targetType: 'user', targetId: row.id });
-      const session = await createSession(q, row.id);
-      const user = await loadUser(q, row.id);
-      if (!user) fail(401, 'Email or recovery code is wrong.', 'bad_recovery');
-      return { user, ...session };
+      if (!consumed) fail(401, 'That reset link is invalid or has expired. Request a new link.', 'bad_reset');
+      await q.query('UPDATE users SET pw_hash = $1 WHERE id = $2', [pwHash, candidate.id]);
+      await q.query('DELETE FROM sessions WHERE user_id = $1', [candidate.id]);
+      await q.query('UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [candidate.id]);
+      await audit(q, { actorId: candidate.id, action: 'auth.reset', targetType: 'user', targetId: candidate.id });
     });
-    setSessionCookie(deps, res, out.token);
-    const response: AccountWithCodeResponse = { user: toMe(out.user), csrf: out.csrf, recoveryCode: formatRecoveryCode(next) };
-    res.json(response);
+    clearSessionCookie(deps, res);
+    res.json({ message: 'Password changed. Sign in with your new password.' });
   });
 
   // Shuffle the assigned pseudonym. Allowed only until the member confirms it.
@@ -203,34 +245,18 @@ export function router(deps: Deps): Router {
     const me = currentUser(res);
     const body = parse(changeBody, req.body);
     await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<Credentials>('SELECT id, pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
+    const row = await db.one<Credentials>('SELECT id, pw_hash FROM users WHERE id = $1', [me.id]);
     if (!(await passwords.verify(body.currentPassword, row.pw_hash))) fail(401, 'Your current password is wrong.', 'bad_credentials', 'currentPassword');
     const pwHash = await passwords.hash(body.newPassword);
     const session = res.locals.session!;
     await db.tx(async (q) => {
       if (!(await credentialsCurrent(q, row))) fail(401, 'Your current password is wrong.', 'bad_credentials', 'currentPassword');
       await q.query('UPDATE users SET pw_hash = $1 WHERE id = $2', [pwHash, me.id]);
+      await q.query('UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [me.id]);
       await q.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2', [me.id, session.tokenHash]);
       await audit(q, { actorId: me.id, action: 'auth.password_change', targetType: 'user', targetId: me.id });
     });
     const response: AuthResponse = { user: toMe(me), csrf: session.csrf };
-    res.json(response);
-  });
-
-  // Issue a fresh recovery code while signed in (for a member who lost the first one). Needs the password.
-  r.post('/auth/recovery-code', requireUser, async (req, res) => {
-    const me = currentUser(res);
-    const body = parse(passwordOnly, req.body);
-    await limit(db, `password:${me.id}`, limits.passwordChange);
-    const row = await db.one<Credentials>('SELECT id, pw_hash, recovery_hash FROM users WHERE id = $1', [me.id]);
-    if (!(await passwords.verify(body.password, row.pw_hash))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
-    const next = newRecoveryCode();
-    await db.tx(async (q) => {
-      if (!(await credentialsCurrent(q, row))) fail(401, 'Your password is wrong.', 'bad_credentials', 'password');
-      await q.query('UPDATE users SET recovery_hash = $1 WHERE id = $2', [recoveryHash(keys, next), me.id]);
-      await audit(q, { actorId: me.id, action: 'auth.recovery_code_reissued', targetType: 'user', targetId: me.id });
-    });
-    const response: RecoveryCodeResponse = { recoveryCode: formatRecoveryCode(next) };
     res.json(response);
   });
 

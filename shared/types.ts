@@ -21,22 +21,10 @@ export interface MeResponse {
   csrf: string | null;
 }
 
-/** POST /api/auth/signup and POST /api/auth/reset. The recovery code is shown once. */
-export interface AccountWithCodeResponse {
-  user: Me;
-  csrf: string;
-  /** 20 Crockford base32 characters formatted as XXXX-XXXX-XXXX-XXXX-XXXX. */
-  recoveryCode: string;
-}
-
-/** POST /api/auth/login, /api/auth/shuffle, /api/auth/confirm-pseudonym, /api/auth/password. */
+/** POST /api/auth/signup, /api/auth/login, /api/auth/shuffle, /api/auth/confirm-pseudonym, /api/auth/password. */
 export interface AuthResponse {
   user: Me;
   csrf: string;
-}
-
-export interface RecoveryCodeResponse {
-  recoveryCode: string;
 }
 
 export interface ApiErrorBody {

@@ -2,11 +2,11 @@ import { useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttri
 import { cx } from '../lib/cx';
 
 /**
- * Focus for every text input: a brand border plus a visible 2 px outline in both themes. Never add
+ * Focus for every text input: a neutral border plus a visible 2 px outline in both themes. Never add
  * focus:outline-none beside it: in Tailwind v4 that sets --tw-outline-style to none, and outline-2
  * reads that variable, so the outline would never show.
  */
-export const INPUT_FOCUS = 'focus:border-brand focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-0 focus-visible:outline-brand';
+export const INPUT_FOCUS = 'focus:border-ink focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-0 focus-visible:outline-cool';
 
 const CONTROL = cx(
   'w-full rounded-input border bg-surface px-4 text-base text-ink placeholder:text-muted transition',
@@ -45,7 +45,7 @@ export function Field(props: FieldProps | TextAreaFieldProps) {
   }
 
   return (
-    <div className={cx('flex flex-col gap-1.5', className)}>
+    <div className={cx('flex flex-col gap-2', className)}>
       <label htmlFor={id} className={cx('text-sm font-bold text-ink', hideLabel && 'sr-only')}>{label}</label>
       {control}
       {hint && <p id={hintId} className="text-sm text-muted">{hint}</p>}

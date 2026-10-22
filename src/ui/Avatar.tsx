@@ -23,7 +23,7 @@ export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
       dir="auto"
       data-initials={initials(name)}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-full bg-brand-soft font-extrabold text-brand [unicode-bidi:isolate]',
+        'inline-flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-extrabold text-ink [unicode-bidi:isolate]',
         'before:content-[attr(data-initials)]',
         SIZES[size],
         className,

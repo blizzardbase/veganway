@@ -13,8 +13,8 @@ export function Chip({ selected = false, icon, className, children, type = 'butt
       type={type}
       aria-pressed={selected}
       className={cx(
-        'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition',
-        selected ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface text-ink hover:bg-surface-2',
+        'chip inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition',
+        selected ? 'border-ink bg-ink text-bg' : 'border-line bg-surface text-ink hover:bg-surface-2',
         className,
       )}
       {...rest}
@@ -30,8 +30,8 @@ export function Tag({ tone = 'soft', children, className }: { tone?: 'soft' | 's
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold',
-        tone === 'soft' && 'bg-brand-soft text-brand',
+        'inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-bold',
+        tone === 'soft' && 'bg-surface-2 text-ink',
         tone === 'saffron' && 'bg-saffron text-on-saffron',
         tone === 'plain' && 'bg-surface-2 text-muted',
         className,

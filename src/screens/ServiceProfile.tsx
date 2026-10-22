@@ -42,12 +42,12 @@ function SaveButton({ slug, saved }: { slug: string; saved: boolean }) {
       onClick={() => requireAccount(() => {
         const next = !saved;
         setSaved.mutate(next, {
-          onSuccess: () => toast.show({ message: next ? 'Saved. Find it in Me.' : 'Removed from saved.', onUndo: () => setSaved.mutate(!next) }),
+          onSuccess: () => toast.show({ success: true, message: next ? 'Saved. Find it in Me.' : 'Removed from saved.', onUndo: () => setSaved.mutate(!next) }),
           onError: (err) => toast.show({ message: errorMessage(err) }),
         });
       })}
     >
-      <Bookmark size={22} aria-hidden="true" className={saved ? 'fill-current text-brand' : undefined} />
+      <Bookmark size={22} aria-hidden="true" className={saved ? 'fill-current text-ink' : undefined} />
     </IconButton>
   );
 }
@@ -107,18 +107,18 @@ export function ServiceProfile() {
       <article className="flex flex-col gap-6 pb-6">
         <header className="flex flex-col gap-4">
           <div data-testid="listing-photo">
-            <HeroMedia name={s.name} category={s.category} kind="service" photoUrl={s.photoUrl} className="-mt-2" />
+            <HeroMedia transitionKey={s.slug} name={s.name} category={s.category} kind="service" photoUrl={s.photoUrl} className="-mt-2" />
             {s.photoUrl && s.photoId && <div className="flex justify-end"><ReportButton targetType="photo" targetId={s.photoId} variant="text" /></div>}
           </div>
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-extrabold break-words">{s.name}</h1>
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               <VeganStatusTag status={s.veganStatus} />
-              {s.category && <Tag tone="plain">{s.category}</Tag>}
+              {s.category && <span data-category={s.category.toLowerCase()}><Tag tone="plain" className="category-chip">{s.category}</Tag></span>}
               {s.ownerRun && <OwnerBadge />}
             </div>
             {s.area && (
-              <p className="flex items-center gap-1.5 text-base text-muted">
+              <p className="flex items-center gap-2 text-base text-muted">
                 <MapPin size={18} aria-hidden="true" />
                 {areaLabel(s.area)}
               </p>
@@ -154,7 +154,7 @@ export function ServiceProfile() {
                       data-testid={`contact-${l.kind}`}
                       className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-bold text-ink hover:bg-surface-2"
                     >
-                      <Icon size={16} aria-hidden="true" className="shrink-0 text-brand" />
+                      <Icon size={16} aria-hidden="true" className="shrink-0 text-ink" />
                       <span className="truncate">{l.label}</span>
                     </a>
                   );
@@ -178,7 +178,7 @@ export function ServiceProfile() {
 
         {!s.ownerRun && (
           <Card className="flex items-center gap-3">
-            <Store size={24} aria-hidden="true" className="shrink-0 text-brand" />
+            <Store size={24} aria-hidden="true" className="shrink-0 text-ink" />
             <p className="flex-1 text-sm">Do you run {s.name}?</p>
             <Button size="md" variant="secondary" onClick={() => requireAccount(() => setSheet('claim'))}>This is my business</Button>
           </Card>

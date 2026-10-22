@@ -38,7 +38,7 @@ export function ReportButton(props: ReportButtonProps) {
       onSuccess: () => {
         setOpen(false);
         setReason(null);
-        toast.show({ message: 'Thanks. An admin will take a look.' });
+        toast.show({ success: true, message: 'Thanks. An admin will take a look.' });
       },
       onError: (err) => {
         const message = err instanceof ApiError && err.status === 404 ? 'Reporting is not available yet.' : errorMessage(err);
@@ -67,7 +67,7 @@ export function ReportButton(props: ReportButtonProps) {
               role="radio"
               aria-checked={reason === r.value}
               onClick={() => setReason(r.value)}
-              className="flex min-h-12 items-center rounded-input border border-line bg-surface px-4 text-left text-base font-semibold aria-checked:border-brand aria-checked:bg-brand-soft aria-checked:text-brand"
+              className="flex min-h-12 items-center rounded-input border border-line bg-surface px-4 text-left text-base font-semibold aria-checked:border-ink aria-checked:bg-surface-2 aria-checked:text-ink"
             >
               {r.label}
             </button>

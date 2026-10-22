@@ -68,8 +68,8 @@ export default function AddProductForm() {
         <ChoiceChips label="Type (optional)" options={PRODUCT_CATEGORIES} value={category} onChange={setCategory} />
 
         <div className="flex flex-col gap-2">
-          <p className="flex items-center gap-1.5 text-sm text-muted">
-            <Leaf size={16} aria-hidden="true" className="text-brand" />
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <Leaf size={16} aria-hidden="true" className="text-ink" />
             Listed as a vegan product.
           </p>
           <Chip selected={recommend} onClick={() => setRecommend(!recommend)} icon={<ThumbsUp size={16} aria-hidden="true" />} className="w-fit">

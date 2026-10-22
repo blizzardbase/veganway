@@ -60,7 +60,7 @@ export function Monogram({ name, category, kind, size = 'md', className }: Monog
   const s = SIZES[size];
   if (size === 'sm') {
     return (
-      <div aria-hidden="true" data-tone={tone} className={cx('flex shrink-0 items-center justify-center', t.tile, t.ink, s.box, className)}>
+      <div aria-hidden="true" data-tone={tone} data-category={category?.toLowerCase() || 'other'} className={cx('flex shrink-0 items-center justify-center', t.tile, t.ink, s.box, className)}>
         <Icon size={s.icon} strokeWidth={2} />
       </div>
     );
@@ -69,15 +69,19 @@ export function Monogram({ name, category, kind, size = 'md', className }: Monog
   return (
     <div
       aria-hidden="true"
-      data-tone={tone}
-      className={cx('relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br', t.gradient, t.ink, s.box, className)}
+      data-tone={tone} data-category={category?.toLowerCase() || 'other'}
+      className={cx('mono-art relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br', t.gradient, t.ink, s.box, className)}
     >
       <Pattern dense={!hero} />
+      <svg aria-hidden="true" viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 size-full" fill="none">
+        <path d="M-12 76 Q18 43 44 68 T112 58 M-12 87 Q18 54 44 79 T112 69" stroke="currentColor" strokeWidth="1" opacity="0.12" />
+        <path d="M72 24 Q72 9 87 10 Q88 23 72 24Z M75 21 L84 13" stroke="currentColor" opacity="0.22" />
+      </svg>
       {hero ? (
         <>
           <span className="absolute -top-16 -right-12 size-48 rounded-full bg-current opacity-[0.07]" />
           <span className="absolute -bottom-20 -left-10 size-40 rounded-full bg-current opacity-[0.05]" />
-          <span className="relative flex size-28 items-center justify-center rounded-full bg-surface/55 shadow-1 ring-1 ring-current/10">
+          <span className="relative flex size-28 items-center justify-center mono-medallion rounded-full bg-surface/55 shadow-1 ring-1 ring-current/10">
             <Icon size={s.icon} strokeWidth={1.75} />
           </span>
         </>

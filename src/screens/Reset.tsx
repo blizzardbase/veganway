@@ -1,87 +1,61 @@
-import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLayoutEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { Button, Field, TopBar } from '../ui';
 import { ApiError, errorMessage } from '../api/client';
-import { useResetWithCode } from '../api/session';
-import { holdRecovery } from '../features/auth/recoveryStore';
-import { safeNext } from '../features/auth/Gate';
-import { PASSWORD_MIN } from '../../shared/types';
+import { useMe, useResetPassword } from '../api/session';
+import { PASSWORD_MAX, PASSWORD_MIN } from '../../shared/types';
 
 export function Reset() {
-  const [params] = useSearchParams();
-  const next = safeNext(params.get('next'), '/');
+  const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '');
   const navigate = useNavigate();
-  const reset = useResetWithCode();
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const { isPending: sessionPending } = useMe();
+  const reset = useResetPassword();
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; recoveryCode?: string; newPassword?: string; form?: string }>({});
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const local: typeof errors = {};
-    if (!email.trim()) local.email = 'Enter your email address.';
-    if (code.replace(/[^0-9A-Za-z]/g, '').length !== 20) local.recoveryCode = 'Your recovery code has 20 characters.';
-    if (password.length < PASSWORD_MIN) local.newPassword = `Use at least ${PASSWORD_MIN} characters.`;
-    setErrors(local);
-    if (Object.keys(local).length) return;
+  const [repeat, setRepeat] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(!/^[A-Za-z0-9_-]{43}$/.test(token));
+  useLayoutEffect(() => {
+    // Keep the token only in this screen's memory, never in history, storage or referrers.
+    window.history.replaceState(window.history.state, '', '/reset');
+  }, []);
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (reset.isPending || sessionPending) return;
+    setError(null);
+    if (password !== repeat) {
+      setError('The passwords do not match.');
+      return;
+    }
     try {
-      const res = await reset.mutateAsync({ email, recoveryCode: code, newPassword: password });
-      holdRecovery({ code: res.recoveryCode, email: email.trim(), next, reason: 'reset' });
-      navigate('/join/recovery', { replace: true, state: { next } });
+      await reset.mutateAsync({ token, newPassword: password });
+      navigate('/signin?reset=done', { replace: true });
     } catch (err) {
-      if (err instanceof ApiError && err.field && ['email', 'recoveryCode', 'newPassword'].includes(err.field)) setErrors({ [err.field]: err.message });
-      else setErrors({ form: errorMessage(err) });
+      if (err instanceof ApiError && err.code === 'bad_reset') setInvalid(true);
+      else setError(errorMessage(err));
     }
   };
-
   return (
     <div className="flex flex-1 flex-col">
       <TopBar back="/signin" />
       <h1 className="text-2xl font-extrabold">Reset your password</h1>
-      <p className="mt-2 text-base text-muted">
-        Enter your email, your recovery code and a new password. You then get a new recovery code, and every other device is signed out.
-      </p>
-      <form className="mt-6 flex flex-1 flex-col gap-5" onSubmit={onSubmit} noValidate>
-        <Field
-          label="Email"
-          type="email"
-          autoComplete="email"
-          inputMode="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          required
-        />
-        <Field
-          label="Recovery code"
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          placeholder="XXXX XXXX XXXX XXXX XXXX"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          error={errors.recoveryCode}
-          inputClassName="font-mono tracking-wider"
-          required
-        />
-        <Field
-          label="New password"
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.newPassword}
-          hint={`At least ${PASSWORD_MIN} characters.`}
-          required
-        />
-        {errors.form && <p role="alert" className="text-sm font-semibold text-danger">{errors.form}</p>}
-        <div className="mt-auto pt-6">
-          <Button type="submit" block busy={reset.isPending} busyLabel="Resetting">Reset password</Button>
+      {invalid ? (
+        <div className="mt-6 flex flex-col gap-4">
+          <p role="alert" className="text-base text-danger">That reset link is invalid or has expired. Request a new link.</p>
+          <Link to="/forgot-password" className="inline-flex min-h-11 items-center font-bold text-ink">Request a new link</Link>
         </div>
-      </form>
+      ) : (
+        <>
+          <p className="mt-2 text-base text-muted">Choose a new password. Every device will be signed out.</p>
+          <form className="mt-6 flex flex-1 flex-col gap-5" onSubmit={onSubmit}>
+            <Field label="New password" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={password} onChange={(event) => setPassword(event.target.value)} hint={`At least ${PASSWORD_MIN} characters.`} required />
+            <Field label="Repeat new password" type="password" autoComplete="new-password" minLength={PASSWORD_MIN} maxLength={PASSWORD_MAX} value={repeat} onChange={(event) => setRepeat(event.target.value)} required />
+            {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
+            <div className="mt-auto pt-6">
+              <Button type="submit" block disabled={sessionPending} busy={reset.isPending} busyLabel="Resetting">Reset password</Button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 }

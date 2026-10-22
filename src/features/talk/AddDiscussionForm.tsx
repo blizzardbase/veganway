@@ -40,7 +40,7 @@ export default function AddDiscussionForm() {
       { kind: 'discussion', title: title.trim(), body: body.trim() || null, tags, listingIds: listings.map((l) => l.id) },
       {
         onSuccess: ({ topic }) => {
-          toast.show({ message: 'Discussion started' });
+          toast.show({ success: true, message: 'Discussion started' });
           navigate(`/talk/${topic.id}`, { replace: true });
         },
       },

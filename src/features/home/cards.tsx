@@ -35,7 +35,7 @@ function whereOf(l: Pick<FeedListing, 'kind' | 'area' | 'stores'>): string {
 /** "New place · 3h": what the card is and when it happened. */
 function Kicker({ icon: Icon, label, at, className }: { icon: LucideIcon; label: string; at: string; className?: string }) {
   return (
-    <p className={cx('flex min-w-0 items-center gap-1.5 text-xs font-extrabold tracking-wide text-brand uppercase', className)}>
+    <p className={cx('flex min-w-0 items-center gap-2 text-xs font-extrabold tracking-wide text-warm uppercase', className)}>
       <Icon size={14} aria-hidden="true" className="shrink-0" />
       <span className="truncate">{label}</span>
       <span aria-hidden="true" className="text-muted">·</span>
@@ -66,7 +66,7 @@ function Thumb({ listing, size }: { listing: FeedListing; size: 'sm' | 'md' }) {
   if (size === 'sm') {
     const { icon: Icon, tone } = monogramStyle(listing.name, listing.category, listing.kind);
     return (
-      <span aria-hidden="true" data-tone={tone} className={cx('flex size-6 shrink-0 items-center justify-center rounded-full', monoTileClass(tone))}>
+      <span aria-hidden="true" data-tone={tone} data-category={listing.category.toLowerCase() || 'other'} className={cx('flex size-6 shrink-0 items-center justify-center rounded-full', monoTileClass(tone))}>
         <Icon size={14} strokeWidth={2.2} />
       </span>
     );
@@ -82,7 +82,7 @@ export function ListingAddedCard({ item }: { item: FeedListingAdded }) {
       <Link to={listingPath(listing)} className={cx(CARD, 'flex flex-col gap-2 p-3 transition hover:shadow-2 active:scale-[0.99]')}>
         <div className="flex gap-3">
           <Thumb listing={listing} size="md" />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <Kicker icon={kind.icon} label={kind.label} at={item.at} />
             <h3 className="line-clamp-1 text-base font-extrabold break-words">{listing.name}</h3>
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -103,7 +103,7 @@ export function ListingAddedCard({ item }: { item: FeedListingAdded }) {
           <span className="min-w-0 flex-1 truncate text-muted">Added by {addedBy.displayName || addedBy.pseudonym}</span>
           {listing.recommendCount > 0 && (
             <span className="flex shrink-0 items-center gap-1 font-bold">
-              <ThumbsUp size={12} aria-hidden="true" className="text-brand" />
+              <ThumbsUp size={12} aria-hidden="true" className="text-warm" />
               {membersRecommend(listing.recommendCount)}
             </span>
           )}
@@ -152,19 +152,19 @@ export function RecommendationCard({ item }: { item: FeedRecommendation }) {
         </div>
         {rec.excerpt && <p className="line-clamp-2 text-sm leading-5 break-words">“{rec.excerpt}”</p>}
         {rec.offer && rec.offerExpiresAt && (
-          <p className="flex min-w-0 items-center gap-1.5 self-start rounded-full bg-saffron py-0.5 pr-2.5 pl-2 text-xs text-on-saffron">
+          <p className="flex min-w-0 items-center gap-2 self-start rounded-full bg-saffron py-0.5 pr-3 pl-2 text-xs text-on-saffron">
             <TagIcon size={12} aria-hidden="true" className="shrink-0" />
             <span className="truncate"><span className="font-extrabold">{rec.offer}</span> until {formatDay(rec.offerExpiresAt)}</span>
           </p>
         )}
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-surface-2 pr-2.5 pl-0.5 text-xs">
+          <span className="inline-flex h-7 min-w-0 items-center gap-2 rounded-full bg-surface-2 pr-3 pl-0.5 text-xs">
             <Thumb listing={listing} size="sm" />
             <span className="truncate font-bold">{listing.name}</span>
           </span>
           {listing.recommendCount > 0 && (
             <span className="ml-auto flex shrink-0 items-center gap-1 text-xs font-bold text-muted">
-              <ThumbsUp size={12} aria-hidden="true" className="text-brand" />
+              <ThumbsUp size={12} aria-hidden="true" className="text-warm" />
               {membersRecommend(listing.recommendCount)}
             </span>
           )}
@@ -199,14 +199,14 @@ export function TopicCard({ item }: { item: FeedTopic }) {
   const poll = topic.kind === 'poll';
   const replies = replyCount(topic.replyCount);
   return (
-    <article data-testid="feed-item" data-type="topic" className={cx(CARD, 'flex flex-col gap-2 p-3')}>
+    <article data-testid="feed-item" data-type="topic" className={cx(CARD, 'feed-topic flex flex-col gap-2 p-4')}>
       <Kicker icon={poll ? ChartColumnBig : MessagesSquare} label={poll ? 'Poll' : 'Discussion'} at={item.at} />
-      <Link to={href} className="-m-1 flex min-h-11 flex-col justify-center gap-0.5 rounded-input p-1">
+      <Link to={href} className="-m-1 flex min-h-11 flex-col justify-center gap-1 rounded-input p-1">
         <h3 className="line-clamp-2 text-base font-extrabold break-words">{topic.title}</h3>
         {topic.excerpt && <p className="line-clamp-2 text-sm text-muted break-words">{topic.excerpt}</p>}
       </Link>
       {topic.poll && <FeedPoll topicId={topic.id} poll={topic.poll} />}
-      <div className="-my-1.5 -ml-3 flex items-center gap-1 text-sm text-muted">
+      <div className="-my-2 -ml-3 flex items-center gap-1 text-sm text-muted">
         <UpvoteButton count={topic.upvotes} upvoted={topic.upvoted} onToggle={() => requireAccount(() => upvote.mutate())} />
         <Link
           to={href}
@@ -235,7 +235,7 @@ export function PinnedCard({ topic }: { topic: TopicSummary }) {
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="line-clamp-2 text-sm font-extrabold break-words">{topic.title}</span>
-        <span className="flex items-center gap-1.5 text-xs text-muted">
+        <span className="flex items-center gap-2 text-xs text-muted">
           {topic.kind === 'poll' && <Tag className="py-0">Poll</Tag>}
           {replyCount(topic.replyCount) ?? 'Be the first to reply'}
         </span>
@@ -262,7 +262,7 @@ function ListingSkeleton() {
 
 function RecommendationSkeleton() {
   return (
-    <div aria-hidden="true" className={cx(CARD, 'flex flex-col gap-2 p-3')}>
+    <div aria-hidden="true" className={cx(CARD, 'feed-topic flex flex-col gap-2 p-4')}>
       <div className="flex items-center gap-2">
         <Skeleton className="size-7 rounded-full" />
         <Skeleton className="h-4 w-1/2" />

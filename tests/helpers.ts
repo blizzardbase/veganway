@@ -15,8 +15,9 @@ import { createDb, type Db, type Queryable } from '../server/db.js';
 import { migrate } from '../server/migrate.js';
 import { scryptHasher, type PasswordHasher } from '../server/lib/crypto.js';
 import { fsMediaStore, type MediaStore } from '../server/lib/media.js';
+import { memoryMailer, type Mailer } from '../server/lib/mailer.js';
 import type { Limits } from '../server/lib/rate.js';
-import type { AccountWithCodeResponse, Me } from '../shared/types.js';
+import type { AuthResponse, Me } from '../shared/types.js';
 
 export const TEST_ORIGIN = 'http://veganway.test';
 export const TEST_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
@@ -89,6 +90,7 @@ export class Agent {
 
 export interface TestApp {
   baseUrl: string;
+  mailer: ReturnType<typeof memoryMailer>;
   db: Db;
   /** How many times the app ran scrypt, by operation. Lets a test prove a limit fired before scrypt. */
   scrypt: { hash: number; verify: number };
@@ -104,6 +106,7 @@ export interface TestAppOptions {
    * members from 127.0.0.1; every other rule uses the real numbers. Pass { signupIp: DEFAULT_LIMITS.signupIp } to test it.
    */
   limits?: Partial<Limits>;
+  mailer?: Mailer;
   /** Express trust proxy setting, so a test can send X-Forwarded-For to act as many clients. */
   trustProxy?: boolean | number;
   /** When given, every SQL statement the app runs (inside a transaction or not) is pushed here in order. */
@@ -137,7 +140,9 @@ export async function makeTestApp(options: TestAppOptions = {}): Promise<TestApp
     verify: (p, s) => { scrypt.verify++; return scryptHasher.verify(p, s); },
   };
   const mediaDir = mkdtempSync(join(tmpdir(), 'vw-media-'));
+  const mailer = memoryMailer();
   const app = createApp({
+    mailer: options.mailer ?? mailer,
     db: options.sqlLog ? recordingDb(db, options.sqlLog) : db,
     serverSecret: TEST_SECRET,
     appOrigin: TEST_ORIGIN,
@@ -152,6 +157,7 @@ export async function makeTestApp(options: TestAppOptions = {}): Promise<TestApp
   const baseUrl = `http://127.0.0.1:${port}`;
   return {
     baseUrl,
+    mailer,
     db,
     scrypt,
     mediaDir,
@@ -175,18 +181,17 @@ export interface SignedUp {
   user: Me;
   email: string;
   password: string;
-  recoveryCode: string;
 }
 
 /** Sign up through the real API and confirm the pseudonym. The agent is then signed in with a CSRF token. */
 export async function signUp(agent: Agent, opts: { email?: string; password?: string } = {}): Promise<SignedUp> {
   const email = opts.email ?? uniqueEmail();
   const password = opts.password ?? 'correct horse battery';
-  const res = await agent.post<AccountWithCodeResponse>('/api/auth/signup', { email, password });
+  const res = await agent.post<AuthResponse>('/api/auth/signup', { email, password });
   if (res.status !== 201) throw new Error(`signUp failed: ${res.status} ${JSON.stringify(res.body)}`);
   const confirmed = await agent.post<{ user: Me }>('/api/auth/confirm-pseudonym');
   if (confirmed.status !== 200) throw new Error(`confirm failed: ${confirmed.status}`);
-  return { agent, user: confirmed.body.user, email, password, recoveryCode: res.body.recoveryCode };
+  return { agent, user: confirmed.body.user, email, password };
 }
 
 /** A fresh signed in member with the admin role (granted directly in the database). */

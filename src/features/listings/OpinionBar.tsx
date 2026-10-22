@@ -1,5 +1,6 @@
 // Recommend / Not for me. One tap, optimistic, with an Undo toast. Signed out visitors go to Join.
 // On a listing page they live in the one sticky bar at the bottom, beside "Add yours".
+import { Tick } from '../../ui/Tick';
 import { useState } from 'react';
 import { useLocation } from 'react-router';
 import { useUser } from '../../api/session';
@@ -18,9 +19,9 @@ type OpinionListing = Pick<ListingDetail, 'slug' | 'myOpinion' | 'recommendCount
 /** "12 members recommend", or an invitation while nobody has. Never a 0. */
 export function OpinionSummary({ count, className }: { count: number; className?: string }) {
   return (
-    <p data-testid="opinion-summary" className={cx('flex items-center gap-1.5 text-sm font-bold', count > 0 ? 'text-ink' : 'text-muted', className)}>
-      <ThumbsUp size={16} aria-hidden="true" className="shrink-0 text-brand" />
-      {count > 0 ? membersRecommend(count) : 'Be the first to recommend'}
+    <p data-testid="opinion-summary" className={cx('flex items-center gap-2 text-sm font-bold', count > 0 ? 'text-ink' : 'text-muted', className)}>
+      <ThumbsUp size={16} aria-hidden="true" className="shrink-0 text-warm" />
+      {count > 0 ? <Tick value={count}>{membersRecommend(count)}</Tick> : 'Be the first to recommend'}
     </p>
   );
 }
@@ -35,7 +36,7 @@ function useChoose(listing: OpinionListing) {
       const next = prev === value ? null : value;
       setOpinion.mutate(next, {
         onError: (err) => toast.show({ message: errorMessage(err) }),
-        onSuccess: () => toast.show({
+        onSuccess: () => toast.show({ success: true,
           message: next === 'recommend' ? 'You recommend this.' : next === 'not_for_me' ? 'Marked as not for you.' : 'Your vote was removed.',
           onUndo: () => setOpinion.mutate(prev),
         }),
@@ -63,16 +64,17 @@ export function ListingActionBar({ listing, name }: { listing: OpinionListing; n
         aria-pressed={on}
         onClick={() => choose(value)}
         className={cx(
-          'flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-input text-xs font-bold transition active:scale-[0.97]',
+          value === 'recommend' && 'recommend-toggle',
+          'flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-input text-xs font-bold transition active:scale-[0.97]',
           on
-            ? value === 'recommend' ? 'bg-brand-soft text-brand' : 'bg-surface-2 text-ink'
+            ? value === 'recommend' ? 'bg-warm-soft text-warm' : 'bg-surface-2 text-ink'
             : 'text-muted hover:bg-surface-2 hover:text-ink',
         )}
       >
         <Icon size={22} strokeWidth={on ? 2.4 : 1.9} fill={on && value === 'recommend' ? 'currentColor' : 'none'} fillOpacity={0.18} aria-hidden="true" />
         <span className="truncate">
           {label}
-          {count > 0 && <span className="tabular-nums"> {count}</span>}
+          {count > 0 && <span> <Tick value={count} /></span>}
         </span>
       </button>
     );
@@ -88,7 +90,7 @@ export function ListingActionBar({ listing, name }: { listing: OpinionListing; n
             id="recommend"
             type="button"
             onClick={() => requireAccount(() => setComposing(true))}
-            className="ml-1 inline-flex h-12 flex-[1.4] items-center justify-center gap-1.5 rounded-input bg-brand px-3 text-sm font-extrabold text-on-brand shadow-1 transition active:scale-[0.98]"
+            className="ml-1 inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-input bg-brand px-3 text-sm font-extrabold text-on-brand shadow-1 transition active:scale-[0.98]"
           >
             <Plus size={18} strokeWidth={2.6} aria-hidden="true" />
             Add yours

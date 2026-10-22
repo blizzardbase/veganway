@@ -15,6 +15,7 @@ function guard(page: Page, origin: string) {
 }
 
 async function expectNoSeriousA11yIssues(page: Page, where: string) {
+  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
   const results = await new AxeBuilder({ page }).analyze();
   const serious = results.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
@@ -45,17 +46,12 @@ test('sign up, answer Yes, create a service, see contact buttons, find it in sea
   const word = uniqueWord(testInfo.project.name);
   const name = `Kitchen ${word[0].toUpperCase()}${word.slice(1)}`;
 
-  // Sign up and pass the recovery gate.
+  // Sign up and choose a community name.
   await page.goto('/join');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('a long password here');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Keep this name' }).click();
-  await expect(page).toHaveURL(/\/join\/recovery$/);
-  const code = ((await page.getByTestId('recovery-code').textContent()) ?? '').replace(/-/g, '').trim();
-  await page.getByLabel('I saved my recovery code').check();
-  await page.getByLabel('Type the last 4 characters').fill(code.slice(-4));
-  await page.getByRole('button', { name: 'Continue' }).click();
 
   // The service question: Yes opens the form.
   await expect(page).toHaveURL(/\/join\/service$/);

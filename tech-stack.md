@@ -71,3 +71,8 @@ Beat: Biome, because the v1 repository already used ESLint.
 
 Why: Neon runs in Frankfurt, so the function sits next to the database.
 Beat: a VPS, which would need TLS, process management and backups by hand.
+
+## Email: Resend, REST API through `fetch`, no SDK
+
+Why: the free plan covers 3,000 mails a month, one `POST /emails` sends a reset link, and a send only key limits the damage if it leaks. Used only for password reset links, with open and click tracking off.
+Beat: SMTP through a personal webmail account with an app password, which ties the app to a personal account, and sending from an existing domain whose DNS sits on Cloudflare, which was not needed once `veganwaydxb.com` is bought in Vercel.

@@ -13,7 +13,7 @@ export const DEFAULT_LIMITS = {
   signupIp: { max: 10, windowSec: 60 * 60 },
   // Counts accounts created, not attempts, so a flood of refused signups cannot lock everyone out.
   signupGlobal: { max: 600, windowSec: 60 * 60 },
-  resetEmail: { max: 5, windowSec: 60 * 60 },
+  resetEmail: { max: 3, windowSec: 60 * 60 },
   resetIp: { max: 20, windowSec: 60 * 60 },
   shuffle: { max: 40, windowSec: 60 * 60 },
   passwordChange: { max: 10, windowSec: 15 * 60 },

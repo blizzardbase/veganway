@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { createApp } from './app.js';
 import { createDb } from './db.js';
 import { migrate } from './migrate.js';
+import { memoryMailer, resendMailer } from './lib/mailer.js';
 import { fsMediaStore } from './lib/media.js';
 import { DATA_DIR, ROOT, databaseUrl, serverSecret } from './env.js';
 
@@ -39,7 +40,10 @@ async function main() {
   // per IP signup limit, so this switch can never loosen a real deployment.
   const relaxed = process.env.VW_E2E_RELAXED_LIMITS === '1' && url === 'pglite://memory';
   const limits = relaxed ? { signupIp: { max: 1000, windowSec: 3600 } } : undefined;
-  server.use(createApp({ db, serverSecret: serverSecret(), appOrigin, media: fsMediaStore(mediaDir), limits }));
+  const mailer = relaxed ? memoryMailer(process.env.VW_E2E_MAIL_DIR)
+    : production ? resendMailer({ apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM })
+      : memoryMailer();
+  server.use(createApp({ mailer, db, serverSecret: serverSecret(), appOrigin, media: fsMediaStore(mediaDir), limits }));
 
   if (production) {
     const clientDir = resolve(ROOT, 'dist/client');

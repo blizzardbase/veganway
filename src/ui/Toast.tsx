@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence, m, useReducedMotion } from 'motion/react';
 
 export interface ToastInput {
   message: string;
+  success?: boolean;
   /** Shows an Undo button. Use on votes and deletes. */
   onUndo?: () => void;
   /** Milliseconds. Default 4000. */
@@ -27,6 +28,7 @@ export function useToast(): ToastApi {
 
 /** One polite live region above the tab bar. Newest toast replaces older ones. */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const still = useReducedMotion();
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -59,12 +61,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {items.map((t) => (
             <m.div
               key={t.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: still ? 0 : 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, y: still ? 0 : 20 }}
+              transition={still ? { duration: 0.18 } : { type: 'spring', stiffness: 420, damping: 28 }}
               className="pointer-events-auto flex w-full max-w-[528px] items-center gap-3 rounded-card bg-ink px-4 py-2 text-sm font-semibold text-bg shadow-3"
             >
+              {t.success && <svg aria-hidden="true" viewBox="0 0 24 24" className="toast-check size-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 4 4L19 6" pathLength="1" /></svg>}
               <span className="flex-1 py-2">{t.message}</span>
               {t.onUndo && (
                 <button

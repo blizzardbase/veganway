@@ -1,4 +1,4 @@
-// Me: pseudonym and profile, Saved, My posts, My service, Theme, Recovery and password, Privacy,
+// Me: pseudonym and profile, Saved, My posts, My service, Theme, Change password, Privacy,
 // Admin (admins only), Sign out and Delete account.
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -9,7 +9,7 @@ import { useMe, useSignOut } from '../api/session';
 import { useTheme, type ThemeChoice } from '../lib/theme';
 import { useMyPosts, useMyService, useProfile, useUpdateProfile } from '../features/me/api';
 import { EditProfileSheet } from '../features/me/EditProfileSheet';
-import { DeleteAccountSheet, RecoverySheet } from '../features/me/AccountSheets';
+import { DeleteAccountSheet, PasswordSheet } from '../features/me/AccountSheets';
 import { PostsList, listingPath } from '../features/me/Lists';
 import { RequestError } from '../features/me/RequestError';
 import { SavedList } from '../features/listings/SavedList';
@@ -17,7 +17,7 @@ import { SavedList } from '../features/listings/SavedList';
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = `me-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
+    <section aria-labelledby={id} className="settings-group flex flex-col gap-2">
       <h2 id={id} className="text-sm font-bold text-muted">{title}</h2>
       {children}
     </section>
@@ -28,7 +28,7 @@ function NavRow({ to, icon, label, onClick }: { to?: string; icon: ReactNode; la
   const cls = 'flex h-14 w-full items-center gap-3 rounded-input px-2 text-left text-base font-bold hover:bg-surface-2';
   const inner = (
     <>
-      <span className="text-brand">{icon}</span>
+      <span className="text-ink">{icon}</span>
       <span className="flex-1">{label}</span>
       <ChevronRight size={18} aria-hidden="true" className="text-muted" />
     </>
@@ -49,7 +49,7 @@ export function Me() {
   const posts = useMyPosts(signedIn);
   const service = useMyService(signedIn);
   const updateProfile = useUpdateProfile();
-  const [sheet, setSheet] = useState<'edit' | 'recovery' | 'delete' | null>(null);
+  const [sheet, setSheet] = useState<'edit' | 'password' | 'delete' | null>(null);
 
   const chooseTheme = (t: ThemeChoice) => {
     setTheme(t);
@@ -59,7 +59,7 @@ export function Me() {
 
   const onSignOut = () => signOut.mutate(undefined, {
     onSuccess: () => {
-      toast.show({ message: 'Signed out.' });
+      toast.show({ success: true, message: 'Signed out.' });
       navigate('/', { replace: true });
     },
   });
@@ -100,7 +100,7 @@ export function Me() {
   return (
     <>
       <TopBar title="Me" />
-      <div className="flex flex-col gap-7 pb-6">
+      <div data-loading={profile.isPending || posts.isPending || service.isPending} className="me-settings flex flex-col gap-7 pb-6">
         {me.isError && <RequestError message="Could not load your account." retry={() => void me.refetch()} busy={me.isFetching} />}
         <div className="flex items-center gap-4">
           <Avatar name={user.displayName || user.pseudonym} src={shown?.avatarUrl} size="lg" />
@@ -137,7 +137,7 @@ export function Me() {
           ) : null}
           {pendingClaims.map((c) => (
             <p key={c.id} className="px-2 text-sm text-muted">
-              Claim for <Link className="font-bold text-brand" to={listingPath(c.listing.kind, c.listing.slug)}>{c.listing.name}</Link> is waiting. Your code: <span className="font-mono font-bold text-ink">{c.code}</span>
+              Claim for <Link className="font-bold text-ink" to={listingPath(c.listing.kind, c.listing.slug)}>{c.listing.name}</Link> is waiting. Your code: <span className="font-mono font-bold text-ink">{c.code}</span>
             </p>
           ))}
         </Section>
@@ -153,7 +153,7 @@ export function Me() {
 
         <Section title="Account">
           <div className="flex flex-col">
-            <NavRow icon={<KeyRound size={20} aria-hidden="true" />} label="Recovery and password" onClick={() => setSheet('recovery')} />
+            <NavRow icon={<KeyRound size={20} aria-hidden="true" />} label="Change password" onClick={() => setSheet('password')} />
             <NavRow to="/privacy" icon={<ShieldQuestion size={20} aria-hidden="true" />} label="Privacy" />
             {user.role === 'admin' && <NavRow to="/admin" icon={<ShieldCheck size={20} aria-hidden="true" />} label="Admin" />}
           </div>
@@ -177,13 +177,13 @@ export function Me() {
       </div>
 
       <EditProfileSheet open={sheet === 'edit'} onClose={() => setSheet(null)} profile={shown} />
-      <RecoverySheet open={sheet === 'recovery'} onClose={() => setSheet(null)} />
+      <PasswordSheet open={sheet === 'password'} onClose={() => setSheet(null)} />
       <DeleteAccountSheet
         open={sheet === 'delete'}
         onClose={() => setSheet(null)}
         onDeleted={() => {
           setSheet(null);
-          toast.show({ message: 'Your account was deleted.' });
+          toast.show({ success: true, message: 'Your account was deleted.' });
           navigate('/welcome', { replace: true });
         }}
       />

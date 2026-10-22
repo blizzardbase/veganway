@@ -11,7 +11,7 @@ export function Card({ interactive, padded = true, className, ...rest }: CardPro
   return (
     <div
       className={cx(
-        'rounded-card border border-line bg-surface shadow-1',
+        'polished-card rounded-card border border-line bg-surface shadow-1',
         padded && 'p-4',
         interactive && 'transition hover:shadow-2 active:scale-[0.99]',
         className,

@@ -26,8 +26,8 @@ test('only the main CSS blocks rendering', () => {
   assert.equal(sheets.length, 1, 'exactly one stylesheet');
 });
 
-test('the Manrope latin font is preloaded and the file exists', () => {
-  const m = html().match(/<link rel="preload" href="(\/assets\/manrope-latin-wght-normal-[\w-]+\.woff2)" as="font" type="font\/woff2" crossorigin \/>/);
+test('the Geist latin font is preloaded and the file exists', () => {
+  const m = html().match(/<link rel="preload" href="(\/assets\/geist-latin-wght-normal-[\w-]+\.woff2)" as="font" type="font\/woff2" crossorigin \/>/);
   assert.ok(m, 'font preload tag');
   assert.ok(existsSync(join(CLIENT, m[1])), `${m[1]} exists`);
 });

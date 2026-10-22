@@ -218,7 +218,7 @@ export function ClaimsTab() {
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted">Approve only when the owner sent you the same code on WhatsApp from the number the group knows.</p>
       <label className="flex h-11 items-center gap-2 text-sm font-bold">
-        <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="size-5 accent-brand" />
+        <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="size-5 accent-ink" />
         Show decided claims too
       </label>
       {query.isPending ? <Loading /> : <>
@@ -229,7 +229,7 @@ export function ClaimsTab() {
             <p data-testid="admin-claim-code" className="font-mono text-2xl font-extrabold tracking-widest">{c.code}</p>
             <p className="text-base break-words">
               <span className="font-bold">{c.claimant.pseudonym}</span> claims{' '}
-              <Link className="inline-flex min-h-11 items-center font-bold text-brand underline" to={`/${c.listing.kind === 'service' ? 'services' : c.listing.kind === 'product' ? 'products' : 'places'}/${c.listing.slug}`}>{c.listing.name}</Link>
+              <Link className="inline-flex min-h-11 items-center font-bold text-ink underline" to={`/${c.listing.kind === 'service' ? 'services' : c.listing.kind === 'product' ? 'products' : 'places'}/${c.listing.slug}`}>{c.listing.name}</Link>
             </p>
             <p className="text-xs text-muted">{when(c.createdAt)} · {c.status}</p>
             <div className="flex flex-wrap gap-2">
@@ -323,7 +323,7 @@ export function ListingsTab() {
       </form>
 
       {(survivor || loser) && (
-        <Card className="flex flex-col gap-2 border-brand">
+        <Card className="flex flex-col gap-2 border-ink">
           <p className="text-sm">Keep: <span className="font-bold">{survivor?.name ?? 'pick one'}</span></p>
           <p className="text-sm">Merge and hide: <span className="font-bold">{loser?.name ?? 'pick one'}</span></p>
           {survivor && loser && (confirming ? (
@@ -363,7 +363,7 @@ export function AuditTab() {
       {!rows.length && !query.isError && <EmptyState icon={History} line="Nothing in the audit log yet." />}
       <ul className="flex flex-col">
         {rows.map((r) => (
-          <li key={r.id} className="flex flex-col gap-0.5 border-b border-line py-2 last:border-0">
+          <li key={r.id} className="flex flex-col gap-1 border-b border-line py-2 last:border-0">
             <span className="font-mono text-sm font-bold">{r.action}</span>
             <span className="text-xs text-muted break-all">
               {r.actor ?? 'System'} · {when(r.createdAt)}{r.targetType ? ` · ${r.targetType} ${r.targetId ?? ''}` : ''}

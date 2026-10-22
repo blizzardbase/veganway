@@ -1,21 +1,34 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");
+}
+
+
 /* Basil and Saffron. Spec section 7. Light values here; dark values below. */
 @theme {
   --color-*: initial;
-  --color-bg: #fafaf7;
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-2: #f2f4ef;
+  --color-surface-2: #f5f5f5;
   /* The selected segment in a Segmented control: a clear step up from the surface-2 track. */
   --color-segment: #ffffff;
-  --color-ink: #15201a;
-  --color-muted: #5b665f;
-  --color-line: #e3e7e0;
+  --color-ink: #18181b;
+  --color-muted: #626267;
+  --color-line: #e4e4e7;
   --color-brand: #0f6b4a;
   --color-on-brand: #ffffff;
   --color-brand-soft: #e4f2ea;
   --color-saffron: #f5a524;
   --color-on-saffron: #3b2600;
+  --color-warm: #a63f29;
+  --color-warm-soft: #fff0e9;
+  --color-cool: #4149ab;
+  --color-cool-soft: #efefff;
   --color-danger: #c2412d;
   --color-scrim: rgb(5 12 8 / 0.48);
   --color-transparent: transparent;
@@ -41,7 +54,7 @@
   --color-mono-sand-2: #e4d3ba;
   --color-on-mono-sand: #654d31;
 
-  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --text-xs: 12px;
@@ -93,18 +106,22 @@
   /* Dark tokens: an explicit choice in Me, or the system setting when no choice was made. */
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --color-bg: #0e1411;
-    --color-surface: #151d18;
-    --color-surface-2: #1c2620;
-    --color-segment: #34463c;
-    --color-ink: #e8eee9;
-    --color-muted: #9aa79f;
-    --color-line: #26322b;
+    --color-bg: #101012;
+    --color-surface: #18181b;
+    --color-surface-2: #242427;
+    --color-segment: #3f3f46;
+    --color-ink: #f4f4f5;
+    --color-muted: #aaaab2;
+    --color-line: #35353b;
     --color-brand: #4fc48c;
     --color-on-brand: #05210f;
     --color-brand-soft: #173326;
     --color-saffron: #f7b84b;
     --color-on-saffron: #3b2600;
+    --color-warm: #ffb199;
+    --color-warm-soft: #35231f;
+    --color-cool: #b9bdff;
+    --color-cool-soft: #25253e;
     --color-danger: #ff8a73;
     --color-scrim: rgb(0 0 0 / 0.6);
     --color-mono-basil: #15382a;
@@ -132,19 +149,23 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --color-bg: #0e1411;
-      --color-surface: #151d18;
-      --color-surface-2: #1c2620;
-      --color-segment: #34463c;
-      --color-ink: #e8eee9;
-      --color-muted: #9aa79f;
-      --color-line: #26322b;
+      --color-bg: #101012;
+      --color-surface: #18181b;
+      --color-surface-2: #242427;
+      --color-segment: #3f3f46;
+      --color-ink: #f4f4f5;
+      --color-muted: #aaaab2;
+      --color-line: #35353b;
       --color-brand: #4fc48c;
       --color-on-brand: #05210f;
       --color-brand-soft: #173326;
       --color-saffron: #f7b84b;
       --color-on-saffron: #3b2600;
-      --color-danger: #ff8a73;
+      --color-warm: #ffb199;
+    --color-warm-soft: #35231f;
+    --color-cool: #b9bdff;
+    --color-cool-soft: #25253e;
+    --color-danger: #ff8a73;
       --color-scrim: rgb(0 0 0 / 0.6);
       --color-mono-basil: #15382a;
       --color-mono-basil-2: #1c4836;
@@ -185,7 +206,7 @@
     min-height: 100dvh;
   }
   :focus-visible {
-    outline: 2px solid var(--color-brand);
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
   input, textarea, select {
@@ -237,3 +258,272 @@
 @utility pb-actionbar {
   padding-bottom: calc(var(--actionbar-h) + var(--safe-bottom) + 24px);
 }
+
+/* Small, finite gestures. All content keeps its final geometry during entry. */
+@keyframes settle-in {
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
+}
+@keyframes vote-pop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.18) rotate(-7deg); }
+}
+@keyframes shimmer-pass {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+@keyframes add-arrive {
+  from { transform: scale(0.88) rotate(-12deg); }
+  to { transform: scale(1) rotate(0); }
+}
+
+.polished-card {
+  box-shadow: 0 2px 3px rgb(5 21 12 / 0.025), 0 6px 20px rgb(5 21 12 / 0.025);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.listing-card { padding: 16px; align-items: flex-start; }
+.listing-card h3 { letter-spacing: -0.025em; }
+.listing-card [data-tone] { box-shadow: inset 0 0 0 1px rgb(5 21 12 / 0.04); }
+.page-surface h1, .page-surface h2, .welcome-screen h1 { text-wrap: balance; letter-spacing: -0.035em; }
+.page-surface section > h2:not(.sr-only)::after {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  width: 20px;
+  height: 3px;
+  border-radius: 99px;
+  margin-inline-start: 8px;
+  background: var(--color-saffron);
+}
+.welcome-card {
+  position: relative;
+  isolation: isolate;
+  background-image: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--color-saffron) 13%, transparent), transparent 55%);
+  box-shadow: var(--shadow-1);
+}
+.welcome-card > span:first-child { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-ink) 8%, transparent); }
+.welcome-screen h1 { max-width: 20ch; }
+.welcome-screen > ul > li > span:first-child { border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent); }
+.empty-state {
+  border: 1px dashed var(--color-line);
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 50% 0%, var(--color-surface-2), transparent 70%);
+}
+.empty-mark { margin-block: 12px 8px; }
+.search-hint {
+  border-radius: 20px;
+  margin-top: 24px;
+  padding: 32px 24px;
+  background: radial-gradient(ellipse at 50% 0%, var(--color-surface-2), transparent 85%);
+  border: 1px dashed var(--color-line);
+  text-wrap: balance;
+}
+.search-result { transition: background-color 180ms ease, transform 180ms ease; }
+.hero-media { border-radius: 0 0 28px 28px; }
+.mono-medallion { outline: 1px solid color-mix(in srgb, currentColor 15%, transparent); outline-offset: 9px; }
+.tab-indicator { transition: transform 300ms cubic-bezier(.22,.8,.25,1), opacity 180ms ease; }
+.add-button { animation: add-arrive 420ms cubic-bezier(.2,.8,.2,1); }
+.add-button > svg { transition: transform 220ms ease; }
+.add-button:active > svg { transform: rotate(90deg); }
+.pressable:active:not(:disabled) { transform: scale(.97); }
+button[aria-pressed="true"] > svg { animation: vote-pop 300ms ease-out; }
+.stagger-list > li { animation: settle-in 320ms cubic-bezier(.2,.8,.2,1) backwards; }
+.stagger-list > li:nth-child(2) { animation-delay: 35ms; }
+.stagger-list > li:nth-child(3) { animation-delay: 70ms; }
+.stagger-list > li:nth-child(4) { animation-delay: 105ms; }
+.stagger-list > li:nth-child(5) { animation-delay: 140ms; }
+.stagger-list > li:nth-child(n+6) { animation-delay: 175ms; }
+.skeleton-shimmer { position: relative; overflow: hidden; }
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-ink) 8%, transparent), transparent);
+  animation: shimmer-pass 1200ms ease-in-out 2;
+}
+dialog[open] { animation-timing-function: cubic-bezier(.16,1,.3,1); animation-duration: 300ms; }
+dialog[open]::backdrop { animation: fade-in 180ms ease-out; }
+@media (hover: hover) {
+  .polished-card:hover { border-color: color-mix(in srgb, var(--color-ink) 28%, var(--color-line)); box-shadow: var(--shadow-2); }
+  .add-button:hover > svg { transform: rotate(90deg); }
+}
+/* CSS gestures must opt out as well as Motion's reducedMotion="user" configuration. */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-list > li, .add-button, button[aria-pressed="true"] > svg,
+  .skeleton-shimmer::after, dialog[open], dialog[open]::backdrop { animation: none !important; }
+  .pressable:active:not(:disabled), .polished-card:active, .search-result:active,
+  .add-button:active, .add-button:active > svg, .add-button:hover > svg { transform: none !important; }
+  .tab-indicator, .add-button > svg { transition: none !important; }
+  /* Covers existing utility press scales on chips, links and icon buttons. */
+  :is(a, button):active { transform: none !important; scale: none !important; }
+}
+
+/* Round 2: one botanical colour identity per category, shared by every surface. */
+[data-category] { --category-soft: #eeedeb; --category-deep: #dad8d4; --category-ink: #514d46; }
+[data-category="restaurant"] { --category-soft: hsl(30 8% 92%); --category-deep: hsl(30 8% 83%); --category-ink: hsl(30 8% 23%); }
+:root[data-theme="dark"] [data-category="restaurant"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+[data-category="cafe"] { --category-soft: hsl(26 38% 92%); --category-deep: hsl(26 38% 83%); --category-ink: hsl(26 38% 23%); }
+:root[data-theme="dark"] [data-category="cafe"] { --category-soft: hsl(26 38% 16%); --category-deep: hsl(26 38% 22%); --category-ink: hsl(26 38% 81%); }
+[data-category="bakery"] { --category-soft: hsl(40 72% 92%); --category-deep: hsl(40 72% 83%); --category-ink: hsl(40 72% 23%); }
+:root[data-theme="dark"] [data-category="bakery"] { --category-soft: hsl(40 72% 16%); --category-deep: hsl(40 72% 22%); --category-ink: hsl(40 72% 81%); }
+[data-category="desserts"] { --category-soft: hsl(350 48% 92%); --category-deep: hsl(350 48% 83%); --category-ink: hsl(350 48% 23%); }
+:root[data-theme="dark"] [data-category="desserts"] { --category-soft: hsl(350 48% 16%); --category-deep: hsl(350 48% 22%); --category-ink: hsl(350 48% 81%); }
+[data-category="juice bar"] { --category-soft: hsl(30 8% 92%); --category-deep: hsl(30 8% 83%); --category-ink: hsl(30 8% 23%); }
+:root[data-theme="dark"] [data-category="juice bar"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+[data-category="dairy free"] { --category-soft: hsl(210 45% 92%); --category-deep: hsl(210 45% 83%); --category-ink: hsl(210 45% 23%); }
+:root[data-theme="dark"] [data-category="dairy free"] { --category-soft: hsl(210 45% 16%); --category-deep: hsl(210 45% 22%); --category-ink: hsl(210 45% 81%); }
+[data-category="meat free"] { --category-soft: hsl(12 48% 92%); --category-deep: hsl(12 48% 83%); --category-ink: hsl(12 48% 23%); }
+:root[data-theme="dark"] [data-category="meat free"] { --category-soft: hsl(12 48% 16%); --category-deep: hsl(12 48% 22%); --category-ink: hsl(12 48% 81%); }
+[data-category="snacks"] { --category-soft: hsl(31 58% 92%); --category-deep: hsl(31 58% 83%); --category-ink: hsl(31 58% 23%); }
+:root[data-theme="dark"] [data-category="snacks"] { --category-soft: hsl(31 58% 16%); --category-deep: hsl(31 58% 22%); --category-ink: hsl(31 58% 81%); }
+[data-category="sweets"] { --category-soft: hsl(320 42% 92%); --category-deep: hsl(320 42% 83%); --category-ink: hsl(320 42% 23%); }
+:root[data-theme="dark"] [data-category="sweets"] { --category-soft: hsl(320 42% 16%); --category-deep: hsl(320 42% 22%); --category-ink: hsl(320 42% 81%); }
+[data-category="drinks"] { --category-soft: hsl(180 44% 92%); --category-deep: hsl(180 44% 83%); --category-ink: hsl(180 44% 23%); }
+:root[data-theme="dark"] [data-category="drinks"] { --category-soft: hsl(180 44% 16%); --category-deep: hsl(180 44% 22%); --category-ink: hsl(180 44% 81%); }
+[data-category="pantry"] { --category-soft: hsl(63 45% 92%); --category-deep: hsl(63 45% 83%); --category-ink: hsl(63 45% 23%); }
+:root[data-theme="dark"] [data-category="pantry"] { --category-soft: hsl(63 45% 16%); --category-deep: hsl(63 45% 22%); --category-ink: hsl(63 45% 81%); }
+[data-category="home baker"] { --category-soft: hsl(19 54% 92%); --category-deep: hsl(19 54% 83%); --category-ink: hsl(19 54% 23%); }
+:root[data-theme="dark"] [data-category="home baker"] { --category-soft: hsl(19 54% 16%); --category-deep: hsl(19 54% 22%); --category-ink: hsl(19 54% 81%); }
+[data-category="caterer"] { --category-soft: hsl(30 8% 92%); --category-deep: hsl(30 8% 83%); --category-ink: hsl(30 8% 23%); }
+:root[data-theme="dark"] [data-category="caterer"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+[data-category="meal prep"] { --category-soft: hsl(30 8% 92%); --category-deep: hsl(30 8% 83%); --category-ink: hsl(30 8% 23%); }
+:root[data-theme="dark"] [data-category="meal prep"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+[data-category="cooking class"] { --category-soft: hsl(265 35% 92%); --category-deep: hsl(265 35% 83%); --category-ink: hsl(265 35% 23%); }
+:root[data-theme="dark"] [data-category="cooking class"] { --category-soft: hsl(265 35% 16%); --category-deep: hsl(265 35% 22%); --category-ink: hsl(265 35% 81%); }
+[data-category="shop"] { --category-soft: hsl(30 8% 92%); --category-deep: hsl(30 8% 83%); --category-ink: hsl(30 8% 23%); }
+:root[data-theme="dark"] [data-category="shop"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+[data-category="other"] { --category-soft: hsl(195 25% 92%); --category-deep: hsl(195 25% 83%); --category-ink: hsl(195 25% 23%); }
+:root[data-theme="dark"] [data-category="other"] { --category-soft: hsl(195 25% 16%); --category-deep: hsl(195 25% 22%); --category-ink: hsl(195 25% 81%); }
+
+[data-tone][data-category] { color: var(--category-ink); background: linear-gradient(135deg, var(--category-soft), var(--category-deep)); }
+.listing-card[data-category] { border-inline-start: 4px solid var(--category-deep); background: linear-gradient(110deg, color-mix(in srgb, var(--category-soft) 42%, var(--color-surface)), var(--color-surface) 70%); }
+.category-chip { background: var(--category-soft); color: var(--category-ink); }
+.category-filter[aria-pressed="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-bg); }
+.segment-pill { position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--segments)); border-radius: 9px; background: var(--color-segment); box-shadow: var(--shadow-1); transform: translateX(calc(var(--selected) * 100%)); transition: transform 420ms cubic-bezier(.22,1.25,.4,1); }
+.scroll-title { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 800; font-size: 14px; opacity: 0; transition: opacity 180ms ease; }
+.scroll-title.is-visible { opacity: 1; }
+.welcome-screen h1 { max-width: none; text-wrap: initial; }
+.welcome-first-line { display: block; font-size: clamp(21px, 6vw, 28px); letter-spacing: -.045em; }
+.welcome-screen .welcome-features { gap: 12px; }
+.welcome-features > li { padding: 8px 12px; border-radius: 16px; background: linear-gradient(110deg, var(--color-surface-2), transparent); }
+.welcome-features > li:nth-child(2) { background: linear-gradient(110deg, var(--color-mono-saffron), transparent); }
+.welcome-features > li:nth-child(3) { background: linear-gradient(110deg, var(--color-mono-terracotta), transparent); }
+.welcome-sun { transform-box: fill-box; transform-origin: center; animation: sun-turn 1600ms ease-out; }
+.welcome-greens { transform-box: fill-box; transform-origin: 50% 100%; animation: leaf-sway 1500ms ease-in-out; }
+.welcome-steam { color: var(--color-ink); opacity: 0; animation: steam-rise 1800ms ease-out 200ms; }
+.add-tiles > li { animation-name: tile-arrive; animation-duration: 450ms; animation-timing-function: cubic-bezier(.2,1.3,.4,1); }
+.add-tile { background: linear-gradient(135deg, var(--category-soft), var(--color-surface)); border-color: var(--category-deep); }
+.add-tile > svg { color: var(--category-ink); }
+button[aria-pressed="true"] > .lucide-arrow-big-up { animation: arrow-bounce 420ms ease-out; }
+button[aria-pressed="true"] > .lucide-bookmark { animation: bookmark-spring 480ms cubic-bezier(.2,1.5,.5,1); }
+.chip[aria-pressed="true"] { animation: chip-spring 380ms cubic-bezier(.2,1.4,.4,1); }
+.count-tick { display: inline-block; animation: count-tick 240ms ease-out; }
+.recommend-toggle { position: relative; overflow: visible; }
+.recommend-toggle[aria-pressed="true"]::after { content: ''; position: absolute; width: 5px; height: 8px; border-radius: 80% 0; background: var(--color-warm); top: 8px; left: 50%; pointer-events: none; opacity: 0; box-shadow: -20px 2px var(--color-warm), 20px 0 var(--color-saffron), -10px -10px var(--color-saffron), 12px -14px var(--color-warm); animation: leaf-burst 600ms ease-out; }
+.toast-check path { stroke-dasharray: 1; animation: draw-check 400ms ease-out both; }
+.listing-talk { display: flex; flex-direction: column; gap: 20px; min-height: 324px; }
+.listing-talk > section:first-child { min-height: 140px; }
+.listing-talk > section:last-child { min-height: 164px; }
+.empty-mark { width: 88px; height: 88px; border-radius: 38% 62% 65% 35% / 50% 36% 64% 50%; background: linear-gradient(145deg, var(--color-surface-2), var(--color-surface-2)); box-shadow: 0 8px 24px color-mix(in srgb, var(--color-ink) 8%, transparent); }
+.empty-mark > svg:first-child { inset: -4px -12px; }
+@keyframes sun-turn { from { transform: rotate(-20deg); } to { transform: rotate(0); } }
+@keyframes leaf-sway { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-5deg); } 65% { transform: rotate(3deg); } }
+@keyframes steam-rise { 0% { opacity: 0; transform: translateY(12px); } 35% { opacity: .35; } 100% { opacity: 0; transform: translateY(-16px); } }
+@keyframes tile-arrive { from { transform: scale(.9) translateY(12px); } to { transform: scale(1) translateY(0); } }
+@keyframes arrow-bounce { 0%,100% { transform: translateY(0); } 35% { transform: translateY(-6px); } 65% { transform: translateY(2px); } }
+@keyframes bookmark-spring { 0% { transform: scale(.7); } 55% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes chip-spring { 0% { transform: scale(.94); } 55% { transform: scale(1.035); } 100% { transform: scale(1); } }
+@keyframes count-tick { from { transform: translateY(5px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+@keyframes leaf-burst { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-30px) scale(1.3) rotate(20deg); } }
+@keyframes draw-check { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .welcome-sun, .welcome-greens, .welcome-steam, .add-tiles > li, .chip[aria-pressed], .count-tick, .recommend-toggle::after, .toast-check path { animation: none !important; }
+  .segment-pill { transition: none; }
+}
+.vegan-options-tag { color: var(--color-on-mono-olive); background: var(--color-mono-olive); }
+
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) [data-category="restaurant"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+:root:not([data-theme="light"]) [data-category="cafe"] { --category-soft: hsl(26 38% 16%); --category-deep: hsl(26 38% 22%); --category-ink: hsl(26 38% 81%); }
+:root:not([data-theme="light"]) [data-category="bakery"] { --category-soft: hsl(40 72% 16%); --category-deep: hsl(40 72% 22%); --category-ink: hsl(40 72% 81%); }
+:root:not([data-theme="light"]) [data-category="desserts"] { --category-soft: hsl(350 48% 16%); --category-deep: hsl(350 48% 22%); --category-ink: hsl(350 48% 81%); }
+:root:not([data-theme="light"]) [data-category="juice bar"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+:root:not([data-theme="light"]) [data-category="dairy free"] { --category-soft: hsl(210 45% 16%); --category-deep: hsl(210 45% 22%); --category-ink: hsl(210 45% 81%); }
+:root:not([data-theme="light"]) [data-category="meat free"] { --category-soft: hsl(12 48% 16%); --category-deep: hsl(12 48% 22%); --category-ink: hsl(12 48% 81%); }
+:root:not([data-theme="light"]) [data-category="snacks"] { --category-soft: hsl(31 58% 16%); --category-deep: hsl(31 58% 22%); --category-ink: hsl(31 58% 81%); }
+:root:not([data-theme="light"]) [data-category="sweets"] { --category-soft: hsl(320 42% 16%); --category-deep: hsl(320 42% 22%); --category-ink: hsl(320 42% 81%); }
+:root:not([data-theme="light"]) [data-category="drinks"] { --category-soft: hsl(180 44% 16%); --category-deep: hsl(180 44% 22%); --category-ink: hsl(180 44% 81%); }
+:root:not([data-theme="light"]) [data-category="pantry"] { --category-soft: hsl(63 45% 16%); --category-deep: hsl(63 45% 22%); --category-ink: hsl(63 45% 81%); }
+:root:not([data-theme="light"]) [data-category="home baker"] { --category-soft: hsl(19 54% 16%); --category-deep: hsl(19 54% 22%); --category-ink: hsl(19 54% 81%); }
+:root:not([data-theme="light"]) [data-category="caterer"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+:root:not([data-theme="light"]) [data-category="meal prep"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+:root:not([data-theme="light"]) [data-category="cooking class"] { --category-soft: hsl(265 35% 16%); --category-deep: hsl(265 35% 22%); --category-ink: hsl(265 35% 81%); }
+:root:not([data-theme="light"]) [data-category="shop"] { --category-soft: hsl(30 8% 16%); --category-deep: hsl(30 8% 22%); --category-ink: hsl(30 8% 81%); }
+:root:not([data-theme="light"]) [data-category="other"] { --category-soft: hsl(195 25% 16%); --category-deep: hsl(195 25% 22%); --category-ink: hsl(195 25% 81%); }
+}
+.topic-accent[data-category] { border-inline-start: 4px solid var(--category-deep); background: linear-gradient(110deg, color-mix(in srgb, var(--category-soft) 35%, var(--color-surface)), var(--color-surface) 70%); }
+.linked-category[data-category] > a { border-color: var(--category-deep); background: var(--category-soft); color: var(--category-ink); }
+/* Lower sections appear at their final position, after their variable height content resolves. */
+.listing-detail:has([aria-label="Loading recommendations"]) .listing-talk,
+.listing-talk:has([role="status"]) { visibility: hidden; }
+
+/* Round 3: neutral canvas, semantic accents and a single four pixel rhythm. */
+:root { --space-unit: 4px; }
+body { font-variant-numeric: tabular-nums; }
+h1, h2, h3 { letter-spacing: -.035em; }
+h1 { font-weight: 750; }
+h2 { font-weight: 700; }
+h3 { font-weight: 650; }
+.page-header { border-bottom: 1px solid transparent; transition: border-color 200ms ease, background-color 200ms ease; }
+.page-header.is-condensed { border-color: var(--color-line); background: var(--color-bg); }
+.page-header h1 { transform-origin: left center; transition: transform 200ms ease; }
+.page-header.is-condensed h1 { transform: scale(.91); }
+.page-surface section > h2:not(.sr-only)::after { display: none; }
+.listing-card[data-category] { border: 1px solid var(--color-line); background: var(--color-surface); }
+.polished-card { box-shadow: none; }
+.listing-card, .topic-accent { gap: 16px; }
+.listing-card h3 { font-size: 18px; line-height: 24px; }
+.listing-detail { gap: 24px; }
+.listing-detail > header { padding-bottom: 24px; border-bottom: 1px solid var(--color-line); }
+.listing-detail > section { padding: 16px; border: 1px solid var(--color-line); border-radius: 16px; }
+.listing-detail > section[aria-labelledby="recs-h"] { background: var(--color-surface); border-top: 3px solid var(--color-warm); }
+.listing-talk > section { padding: 16px; border: 1px solid var(--color-line); border-radius: 16px; }
+.listing-talk > section:last-child { border-top: 3px solid var(--color-cool); }
+.topic-accent, .topic-accent[data-category] { border-inline-start: 3px solid var(--color-cool); background: var(--color-surface); }
+.topic-accent h2, .topic-accent .lucide-message-circle { color: var(--color-cool); }
+.welcome-features > li { background: var(--color-surface-2); }
+.welcome-features > li:nth-child(2) { background: var(--color-warm-soft); }
+.welcome-features > li:nth-child(3) { background: var(--color-cool-soft); }
+.welcome-card { background: var(--color-surface-2); }
+.settings-group { padding: 16px; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-surface); }
+.settings-group > h2 { letter-spacing: .06em; text-transform: uppercase; font-size: 12px; line-height: 16px; }
+.settings-group > button, .settings-group > a { border-bottom: 1px solid var(--color-line); border-radius: 0; }
+.settings-group > :last-child { border-bottom: 0; }
+.route-content { animation: fade-in 180ms ease-out; }
+.polished-card, .topic-accent, .search-result { animation: fade-in 220ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+ .page-header h1, .page-header.is-condensed h1 { transform: none; }
+}
+
+.feed-topic > p:first-child { color: var(--color-cool); }
+.feed-topic { border-inline-start: 3px solid var(--color-cool); }
+.listing-talk > section:first-child { border-top: 3px solid var(--color-cool); }
+
+[data-add-kind] .add-tile { background: var(--color-surface-2); border-color: var(--color-line); }
+[data-add-kind] .add-tile > svg { color: var(--color-ink); }
+[data-add-kind="offer"] .add-tile { background: var(--color-mono-saffron); }
+[data-add-kind="offer"] .add-tile > svg { color: var(--color-on-mono-saffron); }
+:is([data-add-kind="discussion"], [data-add-kind="poll"]) .add-tile { background: var(--color-cool-soft); }
+:is([data-add-kind="discussion"], [data-add-kind="poll"]) .add-tile > svg { color: var(--color-cool); }
+/* Offer actions keep the offer's dark ink in either theme, including hover. */
+.bg-saffron .pressable { color: var(--color-on-saffron); }
+.bg-saffron .pressable:hover { background: rgb(0 0 0 / .06); }
+
+/* Router view transitions crossfade snapshots without retaining live route components. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; animation-timing-function: ease-out; }
+
+/* Initial settings queries settle independently. Keep lower rows out of view while their
+   positions resolve; cached refreshes stay visible because isPending is false. */
+.me-settings[data-loading="true"] > :not(:first-child),
+.me-settings:has([aria-label="Loading saved"]) > section:not(:first-of-type),
+.me-settings:has([aria-label="Loading saved"]) > div:last-child { visibility: hidden; }

@@ -70,7 +70,7 @@ test('SEC-03 failed byte deletion remains visible, suppresses photo URLs, and re
       assert.ok(!JSON.stringify(response.body).includes(`/media/${stored.pathname}`), url);
     }
     // A fresh application instance only knows the durable database work.
-    const restarted = createServer(createApp({ db: local.db, serverSecret: TEST_SECRET, appOrigin: TEST_ORIGIN, media: fsMediaStore(local.mediaDir) }));
+    const restarted = createServer(createApp({ mailer: local.mailer, db: local.db, serverSecret: TEST_SECRET, appOrigin: TEST_ORIGIN, media: fsMediaStore(local.mediaDir) }));
     try {
       await new Promise<void>(resolve => restarted.listen(0, '127.0.0.1', resolve));
       const address = restarted.address();

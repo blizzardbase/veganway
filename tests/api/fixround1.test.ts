@@ -664,14 +664,15 @@ describe('17. privacy page', () => {
     }
   });
 
-  test('the privacy page states the recovery code, IP fingerprint and existing email facts, with no hyphens or em dashes in copy', () => {
+  test('the privacy page states reset email, IP fingerprint and existing email facts, with no hyphens or em dashes in copy', () => {
     const src = readFileSync('src/screens/Privacy.tsx', 'utf8');
     assert.match(src, /keyed fingerprint/i);
     assert.doesNotMatch(src, /the same way/i);
     assert.match(src, /two days/i);
     assert.match(src, /slow down abuse/i);
     assert.match(src, /already has an account/i);
-    assert.match(src, /burner email/i);
+    assert.match(src, /Resend/);
+    assert.match(src, /reset link/i);
     // Copy is the text between JSX tags; class names and code are exempt.
     const copy = [...src.matchAll(/>([^<>{}]+)</g), ...src.matchAll(/'([^'\n]* [^'\n]*\.)'/g)].map((m) => m[1]).join(' ');
     assert.match(copy, /keyed fingerprint/);
