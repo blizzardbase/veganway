@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { Compass, Home, MessagesSquare, Plus, UserRound, type LucideIcon } from 'lucide-react';
 import { cx } from '../lib/cx';
@@ -32,8 +33,37 @@ function Tab({ to, label, icon: Icon, end }: (typeof TABS)[number]) {
   );
 }
 
+/**
+ * iOS 26 Safari can leave the visual viewport offset after the keyboard closes, so fixed bars drift
+ * up into the page (WebKit bug 297779). Once focus leaves a text field, nudge the scroll position so
+ * Safari recomputes it. Harmless elsewhere: scrolling to where we already are changes nothing.
+ */
+function useSafariViewportNudge() {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let timer: number | undefined;
+    const settle = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const field = document.activeElement;
+        if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) return;
+        if (Math.abs(vv.offsetTop) > 0.5) window.scrollTo(window.scrollX, window.scrollY);
+      }, 250);
+    };
+    document.addEventListener('focusout', settle);
+    vv.addEventListener('resize', settle);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('focusout', settle);
+      vv.removeEventListener('resize', settle);
+    };
+  }, []);
+}
+
 /** Home, Explore, Add (raised centre), Talk, Me. 64 px plus the safe area. */
 export function TabBar({ onAdd }: { onAdd: () => void }) {
+  useSafariViewportNudge();
   const { pathname } = useLocation();
   const tab = TABS.findIndex(({ to }) => to === '/' ? pathname === '/' : pathname.startsWith(to));
   const position = tab > 1 ? tab + 1 : tab;

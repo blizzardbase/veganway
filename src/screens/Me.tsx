@@ -89,6 +89,15 @@ export function Me() {
           <NavRow to="/signin" icon={<KeyRound size={20} aria-hidden="true" />} label="Sign in" />
           <NavRow to="/privacy" icon={<ShieldQuestion size={20} aria-hidden="true" />} label="Privacy" />
         </div>
+        {/* Signed out, the choice lives on this device only. */}
+        <Section title="Theme">
+          <Segmented<ThemeChoice>
+            label="Theme"
+            value={theme}
+            onChange={setTheme}
+            options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]}
+          />
+        </Section>
       </>
     );
   }

@@ -82,3 +82,13 @@ test('sign up without a recovery code and reach Home with five tabs', async ({ p
 
   expect(problems).toEqual([]);
 });
+
+test('signed out visitors can switch the theme from Me, and it stays on this device', async ({ page }) => {
+  await page.goto('/me');
+  const dark = page.getByRole('radio', { name: 'Dark' }).or(page.getByRole('button', { name: 'Dark', exact: true })).first();
+  await expect(dark).toBeVisible();
+  await dark.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
